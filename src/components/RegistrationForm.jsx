@@ -3,12 +3,11 @@ import axios from 'axios';
 import { CheckCircle2, AlertCircle, WifiOff } from 'lucide-react';
 import InputField from './InputField';
 import SubmitButton from './SubmitButton';
-
-// TODO: Replace this with the actual Apps Script Web App URL once deployed
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyvw6kIB0e_YFUGuVeSf9G67GRGUOHzRvVFSjF16SV4d2nxueVwJjMz8P5PfWiPKAJTUw/exec';
+import { APPS_SCRIPT_URL } from '../config';
 
 const RegistrationForm = () => {
   const [formData, setFormData] = useState({
+    action: 'registerPatient', // Added for Phase 3
     fullName: '',
     age: '',
     gender: '',
@@ -116,6 +115,7 @@ const RegistrationForm = () => {
         setStatus('success');
         setStatusMessage('Registration successful!');
         setFormData({
+          action: 'registerPatient',
           fullName: '',
           age: '',
           gender: '',

@@ -1,9 +1,21 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { Home } from 'lucide-react';
 import RegistrationForm from '../components/RegistrationForm';
 
 const RegistrationPage = () => {
   return (
     <div className="min-h-screen bg-[var(--color-neutral)] relative overflow-hidden flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      {/* Back to Home Button */}
+      <div className="absolute top-6 left-6 z-20">
+        <Link 
+          to="/" 
+          className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm border border-gray-200 text-gray-600 rounded-xl hover:bg-white hover:text-[var(--color-primary)] hover:border-[var(--color-primary)]/30 transition-all shadow-sm group"
+        >
+          <Home size={18} className="group-hover:scale-110 transition-transform" />
+          <span className="font-headline font-semibold text-sm">Back to Home</span>
+        </Link>
+      </div>
       {/* Decorative background blobs */}
       <div className="absolute top-0 -left-4 w-72 h-72 bg-[var(--color-primary)] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
       <div className="absolute top-0 -right-4 w-72 h-72 bg-[var(--color-secondary)] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
