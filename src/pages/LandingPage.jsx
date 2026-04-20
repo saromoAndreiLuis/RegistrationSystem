@@ -8,10 +8,51 @@ import LighthouseEasterEgg from '../components/LighthouseEasterEgg';
 const LandingPage = () => {
   const { mode } = useAppMode();
   const [showLighthouse, setShowLighthouse] = React.useState(false);
+  const longPressTimer = React.useRef(null);
+  const [isLongPressing, setIsLongPressing] = React.useState(false);
+
+  // Lock Fullscreen keys
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (document.fullscreenElement) {
+        // Prevent F11 and Escape
+        if (e.key === 'F11' || e.key === 'Escape') {
+          e.preventDefault();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleHeartClick = () => {
     if (mode === 'radiant' && !showLighthouse) {
       setShowLighthouse(true);
+    }
+  };
+
+  const startLongPress = () => {
+    setIsLongPressing(true);
+    longPressTimer.current = setTimeout(() => {
+      toggleFullscreen();
+      setIsLongPressing(false);
+    }, 800); // 800ms for long press
+  };
+
+  const endLongPress = () => {
+    clearTimeout(longPressTimer.current);
+    setIsLongPressing(false);
+  };
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
     }
   };
 
@@ -25,8 +66,13 @@ const LandingPage = () => {
       <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-xl px-4 text-center">
         <button 
           onClick={handleHeartClick}
-          className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white shadow-xl text-[var(--color-primary)] mb-8 ring-4 ring-[var(--color-primary)]/10 hover:scale-110 hover:shadow-2xl transition-all duration-300 cursor-pointer focus:outline-none focus:ring-[var(--color-primary)]/50 relative group"
-          title="Click me for a surprise in Radiant Mode!"
+          onMouseDown={startLongPress}
+          onMouseUp={endLongPress}
+          onMouseLeave={endLongPress}
+          onTouchStart={startLongPress}
+          onTouchEnd={endLongPress}
+          className={`inline-flex items-center justify-center w-20 h-20 rounded-full bg-white shadow-xl text-[var(--color-primary)] mb-8 ring-4 ring-[var(--color-primary)]/10 transition-all duration-300 cursor-pointer focus:outline-none focus:ring-[var(--color-primary)]/50 relative group ${isLongPressing ? 'scale-125 shadow-2xl ring-pink-500/20' : 'hover:scale-110 hover:shadow-2xl'}`}
+          title="Click for Lighthouse. Press and Hold to toggle Fullscreen!"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 group-hover:text-pink-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />

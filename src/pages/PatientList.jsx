@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Users, Search, ArrowLeft, MoreHorizontal, UserCircle2, ArrowUpDown, Plus, Loader2, AlertCircle } from 'lucide-react';
+import { Users, Search, ArrowLeft, MoreHorizontal, UserCircle2, ArrowUpDown, Plus, Loader2, AlertCircle, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { APPS_SCRIPT_URL } from '../config';
 
 const PatientRow = ({ patient, category }) => {
@@ -50,7 +50,9 @@ const PatientList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
   
   const displayCategory = category.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
@@ -60,12 +62,7 @@ const PatientList = () => {
         setLoading(true);
         const response = await axios.get(APPS_SCRIPT_URL);
         if (response.data.success) {
-          // Filter patients by the selected category
           const allPatients = response.data.data.patients || [];
-          
-          // Map URL category 'general-registration' to 'General Registration' or similar
-          // Alternatively, just show all if 'general-registration', or filter properly.
-          // For now, let's filter if it matches exactly, or show all if it's 'general-registration'
           const filteredByCategory = category === 'general-registration' 
             ? allPatients 
             : allPatients.filter(p => p.category && p.category.toLowerCase() === displayCategory.toLowerCase());
@@ -90,6 +87,38 @@ const PatientList = () => {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
+    setCurrentPage(1);
+  };
+
+  const exportToCSV = () => {
+    if (patients.length === 0) return;
+    
+    const headers = ['User ID', 'Full Name', 'Age', 'Gender', 'Address', 'Contact Number', 'Category', 'Status'];
+    const rows = patients.map(p => [
+      p.id,
+      p.fullName,
+      p.age,
+      p.gender,
+      p.address,
+      p.contactNumber,
+      p.category,
+      p.status || 'active'
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `TGLFI-Users-${displayCategory}-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const sortedAndFilteredPatients = useMemo(() => {
@@ -104,10 +133,19 @@ const PatientList = () => {
     
     if (sortConfig.key !== null) {
       filterablePatients.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
+        let valA = a[sortConfig.key];
+        let valB = b[sortConfig.key];
+        
+        // Handle numeric IDs for correct sorting
+        if (sortConfig.key === 'id') {
+          valA = Number(valA);
+          valB = Number(valB);
+        }
+
+        if (valA < valB) {
           return sortConfig.direction === 'asc' ? -1 : 1;
         }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
+        if (valA > valB) {
           return sortConfig.direction === 'asc' ? 1 : -1;
         }
         return 0;
@@ -117,59 +155,75 @@ const PatientList = () => {
     return filterablePatients;
   }, [searchTerm, sortConfig, patients]);
 
+  const totalPages = Math.ceil(sortedAndFilteredPatients.length / itemsPerPage);
+  const paginatedPatients = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return sortedAndFilteredPatients.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedAndFilteredPatients, currentPage]);
+
   return (
     <div className="min-h-screen bg-[var(--color-neutral)] py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
+        
+        {/* Header/Search Area */}
         <div className="mb-8">
-          <button onClick={() => navigate(-1)} className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-[var(--color-primary)] mb-4 transition-colors cursor-pointer focus:outline-none">
+          <button onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/admin')} className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-[var(--color-primary)] mb-6 transition-colors cursor-pointer focus:outline-none">
             <ArrowLeft size={16} className="mr-1" /> Back
           </button>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded-xl">
+              <div className="p-3 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded-xl shadow-sm">
                 <Users size={28} />
               </div>
               <div>
-                <h1 className="text-2xl font-headline font-bold text-[var(--color-text-headline)]">
+                <h1 className="text-2xl font-headline font-bold text-[var(--color-text-headline)] leading-tight">
                   {displayCategory}
                 </h1>
-                <p className="text-sm font-body text-[var(--color-text-body)]">
-                  User List
-                </p>
+                <p className="text-sm font-body text-gray-500">User List</p>
               </div>
             </div>
             
-            <div className="flex items-center gap-4 w-full sm:w-auto">
-              <div className="relative w-full sm:w-72">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search size={18} className="text-gray-400" />
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-64 min-w-[200px]">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                  <Search size={18} />
                 </div>
                 <input
                   type="text"
-                  placeholder="Search by name or ID..."
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg font-body focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)] outline-none transition-all"
+                  placeholder="Search name or ID..."
+                  className="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl font-body text-sm focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)] outline-none transition-all shadow-sm"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 />
               </div>
+              
+              <button 
+                onClick={exportToCSV}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all shadow-sm font-headline font-semibold text-sm active:scale-95"
+              >
+                <Download size={18} />
+                <span className="hidden sm:inline">Export CSV</span>
+              </button>
+              
               <button 
                 onClick={() => navigate('/register')}
-                className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors shadow-sm font-headline font-semibold whitespace-nowrap"
+                className="flex items-center gap-2 px-5 py-2.5 bg-[var(--color-primary)] text-white rounded-xl hover:bg-[var(--color-primary-dark)] transition-all shadow-sm font-headline font-semibold text-sm whitespace-nowrap active:scale-95"
               >
-                <Plus size={18} /> Add
+                <Plus size={18} /> Add User
               </button>
             </div>
           </div>
         </div>
 
+        {/* Table Area */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-headline font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-6 py-4 text-left text-xs font-headline font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     onClick={() => handleSort('fullName')}
                   >
                     <div className="flex items-center gap-1">
@@ -178,8 +232,7 @@ const PatientList = () => {
                     </div>
                   </th>
                   <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-headline font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-6 py-4 text-left text-xs font-headline font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     onClick={() => handleSort('id')}
                   >
                     <div className="flex items-center gap-1">
@@ -187,10 +240,10 @@ const PatientList = () => {
                       <ArrowUpDown size={14} className={sortConfig.key === 'id' ? "text-[var(--color-primary)]" : "text-gray-400"} />
                     </div>
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-headline font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-headline font-semibold text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th scope="col" className="relative px-6 py-3">
+                  <th className="relative px-6 py-4">
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>
@@ -198,36 +251,61 @@ const PatientList = () => {
               <tbody className="bg-white divide-y divide-gray-200 font-body">
                 {loading ? (
                   <tr>
-                    <td colSpan="4" className="px-6 py-12 text-center">
+                    <td colSpan="4" className="px-6 py-16 text-center">
                       <div className="flex flex-col items-center justify-center text-gray-500">
-                        <Loader2 className="animate-spin mb-2" size={24} />
-                        <p>Loading patients...</p>
+                        <Loader2 className="animate-spin mb-3 text-[var(--color-primary)]" size={32} />
+                        <p className="text-sm">Loading users...</p>
                       </div>
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="4" className="px-6 py-12 text-center text-red-500">
-                      <div className="flex items-center justify-center gap-2">
-                        <AlertCircle size={20} />
-                        {error}
+                    <td colSpan="4" className="px-6 py-16 text-center text-red-500">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <AlertCircle size={32} />
+                        <p>{error}</p>
                       </div>
                     </td>
                   </tr>
-                ) : sortedAndFilteredPatients.length === 0 ? (
+                ) : paginatedPatients.length === 0 ? (
                   <tr>
-                    <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
-                      No users found.
+                    <td colSpan="4" className="px-6 py-16 text-center text-gray-400">
+                      <p>No users found matching your search.</p>
                     </td>
                   </tr>
                 ) : (
-                  sortedAndFilteredPatients.map((patient) => (
+                  paginatedPatients.map((patient) => (
                     <PatientRow key={patient.id} patient={patient} category={category} />
                   ))
                 )}
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+              <div className="text-sm text-gray-500 font-body">
+                Showing <span className="font-semibold">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-semibold">{Math.min(currentPage * itemsPerPage, sortedAndFilteredPatients.length)}</span> of <span className="font-semibold">{sortedAndFilteredPatients.length}</span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg border border-gray-200 bg-white text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all active:scale-95 shadow-sm"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg border border-gray-200 bg-white text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all active:scale-95 shadow-sm"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

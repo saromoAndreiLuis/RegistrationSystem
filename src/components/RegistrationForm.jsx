@@ -61,6 +61,7 @@ const RegistrationForm = () => {
   const [scannedPatient, setScannedPatient] = useState(null);
   const [newRegistrationId, setNewRegistrationId] = useState(null);
   const [manualId, setManualId] = useState('');
+  const isProcessingQueue = React.useRef(false);
 
   // Offline queue processing
   useEffect(() => {
@@ -74,18 +75,40 @@ const RegistrationForm = () => {
   }, []);
 
   const processQueue = async () => {
-    if (!navigator.onLine) return;
+    if (!navigator.onLine || isProcessingQueue.current) return;
+    
     const queue = JSON.parse(localStorage.getItem('registrationQueue') || '[]');
     if (queue.length === 0) return;
+
+    isProcessingQueue.current = true;
     const remainingQueue = [];
     let processedCount = 0;
-    for (const data of queue) {
+
+    // Create a local copy to process so we don't interfere with new items being added
+    const toProcess = [...queue];
+    // Clear the storage immediately so if user submits something NEW during this process, 
+    // it starts a fresh queue. We will add back failures later.
+    localStorage.setItem('registrationQueue', JSON.stringify([]));
+
+    for (const data of toProcess) {
       try {
-        await axios.post(APPS_SCRIPT_URL, data, { headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+        await axios.post(APPS_SCRIPT_URL, data, { 
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          timeout: 10000 // 10s timeout to avoid hanging
+        });
         processedCount++;
-      } catch { remainingQueue.push(data); }
+      } catch (err) {
+        console.error('Queue item failed, re-queueing:', err);
+        remainingQueue.push(data);
+      }
     }
-    localStorage.setItem('registrationQueue', JSON.stringify(remainingQueue));
+
+    // Merge failed items back into any NEW items that might have been added to the queue
+    const currentQueue = JSON.parse(localStorage.getItem('registrationQueue') || '[]');
+    localStorage.setItem('registrationQueue', JSON.stringify([...remainingQueue, ...currentQueue]));
+    
+    isProcessingQueue.current = false;
+
     if (processedCount > 0 && status !== 'loading') {
       setStatus('success');
       setStatusMessage(`Synced ${processedCount} offline registration(s).`);
