@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Clock, Plus, X, Loader2, AlertCircle } from 'lucide-react';
 import SubmitButton from '../components/SubmitButton';
@@ -7,6 +7,7 @@ import InputField from '../components/InputField';
 import { APPS_SCRIPT_URL } from '../config';
 
 const AddServiceModal = ({ isOpen, onClose, onAdd, eventInfo, patientId }) => {
+
   const [formData, setFormData] = useState({
     serviceName: '',
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -97,6 +98,7 @@ const AddServiceModal = ({ isOpen, onClose, onAdd, eventInfo, patientId }) => {
 
 const EventDetails = () => {
   const { category, patientId, eventId } = useParams();
+  const navigate = useNavigate();
   const [patient, setPatient] = useState(null);
   const [eventInfo, setEventInfo] = useState(null);
   const [services, setServices] = useState([]);
@@ -169,7 +171,7 @@ const EventDetails = () => {
       <div className="min-h-screen bg-[var(--color-neutral)] py-8 px-4 flex flex-col items-center justify-center">
         <AlertCircle className="text-red-500 mb-4" size={48} />
         <h2 className="text-xl font-headline font-bold mb-4">{error || "Event not found"}</h2>
-        <Link to={`/admin/${category}/${patientId}`} className="text-[var(--color-primary)] underline">Back to Patient Details</Link>
+        <button onClick={() => navigate(-1)} className="text-[var(--color-primary)] underline cursor-pointer focus:outline-none">Back</button>
       </div>
     );
   }
@@ -178,7 +180,7 @@ const EventDetails = () => {
     <div className="min-h-screen bg-[var(--color-neutral)] py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         <div className="text-sm font-medium text-gray-500 mb-6 flex items-center gap-2">
-          <Link to={`/admin/${category}/${patientId}`} className="hover:text-[var(--color-primary)] transition-colors">History</Link>
+          <button onClick={() => navigate(-1)} className="hover:text-[var(--color-primary)] transition-colors cursor-pointer focus:outline-none">Back</button>
           <ChevronRight size={14} />
           <span className="text-[var(--color-primary)]">Services</span>
         </div>

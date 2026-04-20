@@ -98,7 +98,7 @@ const PatientDetails = () => {
       <div className="min-h-screen bg-[var(--color-neutral)] py-8 px-4 flex flex-col items-center justify-center">
         <AlertCircle className="text-red-500 mb-4" size={48} />
         <h2 className="text-xl font-headline font-bold mb-4">{error || "Patient not found"}</h2>
-        <Link to={`/admin/${category}`} className="text-[var(--color-primary)] underline">Back to List</Link>
+        <button onClick={() => navigate(-1)} className="text-[var(--color-primary)] underline cursor-pointer focus:outline-none">Back</button>
       </div>
     );
   }
@@ -106,9 +106,9 @@ const PatientDetails = () => {
   return (
     <div className="min-h-screen bg-[var(--color-neutral)] py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
-        <Link to={`/admin/${category}`} className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-[var(--color-primary)] mb-6 transition-colors">
-          <ArrowLeft size={16} className="mr-1" /> Back to Patient List
-        </Link>
+        <button onClick={() => navigate(-1)} className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-[var(--color-primary)] mb-6 transition-colors cursor-pointer focus:outline-none">
+          <ArrowLeft size={16} className="mr-1" /> Back
+        </button>
 
         {/* Header Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8 mb-8 flex flex-col sm:flex-row items-center sm:items-start gap-6">
@@ -138,9 +138,17 @@ const PatientDetails = () => {
 
         {/* History Panel */}
         <div>
-          <h2 className="text-xl font-headline font-bold text-[var(--color-text-headline)] mb-4 flex items-center gap-2">
-            History
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-headline font-bold text-[var(--color-text-headline)] flex items-center gap-2">
+              History
+            </h2>
+            <Link 
+              to={`/register?patientId=${patient.id}&fullName=${encodeURIComponent(patient.fullName || '')}&age=${patient.age || ''}&gender=${encodeURIComponent(patient.gender || '')}&address=${encodeURIComponent(patient.address || '')}&contactNumber=${encodeURIComponent(patient.contactNumber || '')}&category=${encodeURIComponent(patient.category || '')}`}
+              className="px-4 py-2 bg-[var(--color-primary)] text-white text-sm font-semibold rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+            >
+              + Add Service
+            </Link>
+          </div>
           <div className="space-y-3">
             {events.length === 0 ? (
               <div className="p-8 text-center text-gray-500 bg-white border border-gray-100 rounded-2xl shadow-sm border-dashed">

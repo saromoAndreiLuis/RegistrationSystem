@@ -121,9 +121,9 @@ const PatientList = () => {
     <div className="min-h-screen bg-[var(--color-neutral)] py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <Link to="/admin" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-[var(--color-primary)] mb-4 transition-colors">
-            <ArrowLeft size={16} className="mr-1" /> Back to Dashboard
-          </Link>
+          <button onClick={() => navigate(-1)} className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-[var(--color-primary)] mb-4 transition-colors cursor-pointer focus:outline-none">
+            <ArrowLeft size={16} className="mr-1" /> Back
+          </button>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded-xl">

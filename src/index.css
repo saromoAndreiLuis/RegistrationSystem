@@ -43,4 +43,28 @@
     border: 1px solid rgba(255, 255, 255, 0.3);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
   }
+  
+  .lite-mode .glass-panel {
+    background: #FFFFFF;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 1px solid #E5E7EB;
+    box-shadow: none;
+  }
+
+  .lite-mode .animate-blob {
+    display: none !important;
+  }
+}
+
+/* Lighthouse Easter Egg Animations */
+.lighthouse-beam {
+  background: conic-gradient(from 270deg at 50% 100%, transparent 0deg, rgba(253, 224, 71, 0.15) 30deg, rgba(253, 224, 71, 0.5) 90deg, rgba(253, 224, 71, 0.15) 150deg, transparent 180deg);
+  border-radius: 50% 50% 0 0;
+  animation: sweep 4s ease-in-out infinite alternate;
+}
+
+@keyframes sweep {
+  0% { transform: translateX(-50%) rotate(-40deg); }
+  100% { transform: translateX(-50%) rotate(40deg); }
 }

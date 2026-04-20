@@ -220,5 +220,20 @@ POST → Web App URL
 
 ---
 
+## 15. Version History
+
+### [v0.0.4] - 2026-04-20
+**Aesthetics & Flow Optimization**
+- **Dual UI Architecture:** Introduced Radiant (Premium) and Lite (Minimalist) modes with global toggle.
+- **Registration Hierarchy:** Restructured form to follow `Service Program > Program Type > Patient Details`.
+- **Conditional Logic:** Added dynamic fields for Blood Letting (Blood Type, Last Donation, Referrer).
+- **Simultaneous Logging:** Backend now supports `registerAndAddService` to create patient and history records in one click.
+- **Responsive Layout:** Form now uses a 2-column grid on desktop to fit entire registration on one screen without scrolling.
+- **Improved Navigation:** All Back buttons now use browser history (`navigate(-1)`) instead of hardcoded paths.
+- **Easter Egg:** Added a cute Lighthouse animation triggered by the heart icon in Radiant Mode.
+
 **Author:** Andrei Saromo  
 **Version:** Agent-Optimized v3 (No Backend / Free Setup)
+
+---
+

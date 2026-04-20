@@ -4,7 +4,7 @@
  * Instructions:
  * 1. Ensure you have two sheets (tabs) named: "Patients" and "History".
  * 2. "Patients" headers (Row 1): id, timestamp, fullName, age, gender, address, contactNumber, category, status
- * 3. "History" headers (Row 1): patientId, eventName, date, serviceName, time, remarks
+ * 3. "History" headers (Row 1): patientId, eventName, date, serviceName, time, remarks, bloodType, lastDonationDate, referredBy
  */
 
 function doPost(e) {
@@ -26,38 +26,49 @@ function doPost(e) {
     const data = JSON.parse(e.postData.contents);
     const action = data.action || 'registerPatient'; // default action
 
-    if (action === 'registerPatient') {
-      const requiredFields = ['fullName', 'age', 'gender', 'address', 'contactNumber', 'category'];
-      for (let i = 0; i < requiredFields.length; i++) {
-        if (!data[requiredFields[i]]) {
-          return ContentService.createTextOutput(JSON.stringify({ 
-            success: false, 
-            error: "Missing required field: " + requiredFields[i] 
-          })).setMimeType(ContentService.MimeType.JSON);
-        }
-      }
-      
+    // Helper to generate new patient ID
+    const generateNewId = () => {
       const lastRow = patientsSheet.getLastRow();
+      const nextIdNum = lastRow; // Assuming row 1 is header
+      return "'" + String(nextIdNum).padStart(4, '0');
+    };
 
-      // If row 1 is header, subtract 1 to get actual count, then +1 for next ID
-      const nextIdNum = lastRow; 
-
-      const id = String(nextIdNum).padStart(4, '0');
-
+    // Helper to add patient record
+    const appendPatientRecord = (id) => {
       const timestamp = new Date().toISOString();
       const status = "active"; // Default status
       
       patientsSheet.appendRow([
         id,
         timestamp,
-        data.fullName,
-        data.age,
-        data.gender,
-        data.address,
-        data.contactNumber,
-        data.category,
+        data.fullName || "",
+        data.age || "",
+        data.gender || "",
+        data.address || "",
+        data.contactNumber || "",
+        data.category || "",
         status
       ]);
+    };
+
+    // Helper to add history record
+    const appendHistoryRecord = (patientId) => {
+      historySheet.appendRow([
+        patientId,
+        data.eventName || "",
+        data.date || "",
+        data.serviceName || "",
+        data.time || "",
+        data.remarks || "",
+        data.bloodType || "",
+        data.lastDonationDate || "",
+        data.referredBy || ""
+      ]);
+    };
+
+    if (action === 'registerPatient') {
+      const id = generateNewId();
+      appendPatientRecord(id);
 
       return ContentService.createTextOutput(JSON.stringify({ 
         success: true, 
@@ -66,29 +77,37 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
 
     } else if (action === 'addService') {
-      const requiredFields = ['patientId', 'eventName', 'date', 'serviceName', 'time'];
-      for (let i = 0; i < requiredFields.length; i++) {
-        if (!data[requiredFields[i]]) {
-          return ContentService.createTextOutput(JSON.stringify({ 
-            success: false, 
-            error: "Missing required field: " + requiredFields[i] 
-          })).setMimeType(ContentService.MimeType.JSON);
-        }
+      if (!data.patientId) {
+        return ContentService.createTextOutput(JSON.stringify({ 
+          success: false, 
+          error: "Missing required field: patientId" 
+        })).setMimeType(ContentService.MimeType.JSON);
       }
-
-      historySheet.appendRow([
-        data.patientId,
-        data.eventName,
-        data.date,
-        data.serviceName,
-        data.time,
-        data.remarks || ""
-      ]);
+      
+      appendHistoryRecord(data.patientId);
 
       return ContentService.createTextOutput(JSON.stringify({ 
         success: true, 
         message: "Service logged successfully" 
       })).setMimeType(ContentService.MimeType.JSON);
+      
+    } else if (action === 'registerAndAddService') {
+      // Create Patient
+      const id = generateNewId();
+      appendPatientRecord(id);
+      
+      // Remove leading quote for History sheet reference if preferred, but it's safe to keep
+      const cleanId = id.replace("'", "");
+      
+      // Create History/Service Event
+      appendHistoryRecord(cleanId);
+
+      return ContentService.createTextOutput(JSON.stringify({ 
+        success: true, 
+        id: cleanId,
+        message: "Registration and Service logged successfully" 
+      })).setMimeType(ContentService.MimeType.JSON);
+
     } else {
       return ContentService.createTextOutput(JSON.stringify({ 
         success: false, 

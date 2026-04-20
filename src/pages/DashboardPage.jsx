@@ -1,8 +1,9 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { HeartPulse, Droplets, Syringe, Users, ArrowLeft } from 'lucide-react';
 
 const CategoryCard = ({ title, icon: Icon, colorClass, to }) => (
+// omitting unmodified code
   <Link 
     to={to}
     className="group flex flex-col items-center p-8 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-[var(--color-primary)]/30 transition-all duration-300 ease-out hover:-translate-y-1"
@@ -17,6 +18,7 @@ const CategoryCard = ({ title, icon: Icon, colorClass, to }) => (
 );
 
 const DashboardPage = () => {
+  const navigate = useNavigate();
   const currentYear = new Date().getFullYear();
 
   const categories = [
@@ -51,9 +53,9 @@ const DashboardPage = () => {
       <div className="max-w-7xl mx-auto">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <Link to="/" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-[var(--color-primary)] mb-4 transition-colors">
-              <ArrowLeft size={16} className="mr-1" /> Back to Home
-            </Link>
+            <button onClick={() => navigate(-1)} className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-[var(--color-primary)] mb-4 transition-colors cursor-pointer focus:outline-none">
+              <ArrowLeft size={16} className="mr-1" /> Back
+            </button>
             <h1 className="text-3xl font-headline font-bold text-[var(--color-text-headline)]">
               Program Dashboard
             </h1>
