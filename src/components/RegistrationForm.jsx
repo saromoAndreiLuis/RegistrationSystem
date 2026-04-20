@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
-import { CheckCircle2, AlertCircle, WifiOff } from 'lucide-react';
+import { CheckCircle2, AlertCircle, WifiOff, Camera, Lock, Unlock, Search } from 'lucide-react';
 import InputField from './InputField';
 import SubmitButton from './SubmitButton';
+import QRScanner from './QRScanner';
+import PatientIDCard from './PatientIDCard';
+import BarcodeListener from './BarcodeListener';
 import { APPS_SCRIPT_URL } from '../config';
+import { usePatientCache } from '../context/PatientCacheContext';
 
 const SERVICE_PROGRAMS = ['CWOP', 'Blood Letting', 'Blood Extraction', 'General Registration'];
 
@@ -12,34 +16,53 @@ const getProgramTypes = (service) => {
   switch (service) {
     case 'CWOP': return ['Medical', 'Dental', 'Optical', 'Cervical', 'Hairstyle', 'Physical Therapy', 'OB-GYN', 'PEDIA', 'DERMA'];
     case 'Blood Letting': return ['Donor'];
-    default: return []; 
+    default: return [];
   }
+};
+
+const EMPTY_FORM = {
+  action: 'registerAndAddService',
+  serviceProgram: '',
+  programType: '',
+  fullName: '',
+  age: '',
+  gender: '',
+  address: '',
+  contactNumber: '',
+  category: '',
+  bloodType: '',
+  lastDonationDate: '',
+  referredBy: '',
+  patientId: ''
 };
 
 const RegistrationForm = () => {
   const [searchParams] = useSearchParams();
   const existingPatientId = searchParams.get('patientId');
+  const { findPatientById } = usePatientCache();
 
   const [formData, setFormData] = useState({
+    ...EMPTY_FORM,
     action: existingPatientId ? 'addService' : 'registerAndAddService',
-    serviceProgram: '',
-    programType: '',
     fullName: searchParams.get('fullName') || '',
     age: searchParams.get('age') || '',
     gender: searchParams.get('gender') || '',
     address: searchParams.get('address') || '',
     contactNumber: searchParams.get('contactNumber') || '',
     category: searchParams.get('category') || '',
-    bloodType: '',
-    lastDonationDate: '',
-    referredBy: '',
     patientId: existingPatientId || ''
   });
 
   const [errors, setErrors] = useState({});
-  const [status, setStatus] = useState('idle'); 
+  const [status, setStatus] = useState('idle');
   const [statusMessage, setStatusMessage] = useState('');
+  const [isPatientLocked, setIsPatientLocked] = useState(!!existingPatientId);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [scannedPatient, setScannedPatient] = useState(null);
+  const [newRegistrationId, setNewRegistrationId] = useState(null);
+  const [manualId, setManualId] = useState('');
 
+  // Offline queue processing
   useEffect(() => {
     const handleOnline = () => processQueue();
     window.addEventListener('online', handleOnline);
@@ -54,70 +77,96 @@ const RegistrationForm = () => {
     if (!navigator.onLine) return;
     const queue = JSON.parse(localStorage.getItem('registrationQueue') || '[]');
     if (queue.length === 0) return;
-
     const remainingQueue = [];
     let processedCount = 0;
-
     for (const data of queue) {
       try {
-        await axios.post(APPS_SCRIPT_URL, data, {
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-        });
+        await axios.post(APPS_SCRIPT_URL, data, { headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
         processedCount++;
-      } catch (error) {
-        remainingQueue.push(data);
-      }
+      } catch { remainingQueue.push(data); }
     }
-
     localStorage.setItem('registrationQueue', JSON.stringify(remainingQueue));
     if (processedCount > 0 && status !== 'loading') {
       setStatus('success');
-      setStatusMessage(`Successfully synced ${processedCount} offline registration(s).`);
+      setStatusMessage(`Synced ${processedCount} offline registration(s).`);
       setTimeout(() => setStatus('idle'), 5000);
     }
   };
 
+  const handleScan = useCallback((scannedId) => {
+    const patient = findPatientById(scannedId);
+    if (!patient) {
+      setStatus('error');
+      setStatusMessage(`User ID "${scannedId}" not found. Please register as a new user.`);
+      setTimeout(() => setStatus('idle'), 4000);
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      action: 'addService',
+      fullName: patient.fullName || '',
+      age: patient.age || '',
+      gender: patient.gender || '',
+      address: patient.address || '',
+      contactNumber: patient.contactNumber || '',
+      category: patient.category || '',
+      patientId: String(patient.id),
+      serviceProgram: '',
+      programType: '',
+    }));
+    setIsPatientLocked(true);
+    setScannedPatient({ id: patient.id, fullName: patient.fullName });
+    setManualId('');
+    setStatus('idle');
+    setStatusMessage('');
+  }, [findPatientById]);
+
+  const handleManualSearch = () => {
+    const trimmed = manualId.trim();
+    if (!trimmed) return;
+    handleScan(trimmed);
+  };
+
+  const handleUnlock = () => {
+    setFormData(prev => ({
+      ...EMPTY_FORM,
+      serviceProgram: prev.serviceProgram,
+      programType: prev.programType,
+    }));
+    setIsPatientLocked(false);
+    setScannedPatient(null);
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
-    // Reset program type when service program changes
     if (name === 'serviceProgram') {
       setFormData(prev => ({ ...prev, [name]: value, programType: '' }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
-
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   const validate = () => {
     const newErrors = {};
     if (!formData.serviceProgram) newErrors.serviceProgram = 'Service Program is required';
-    
     const types = getProgramTypes(formData.serviceProgram);
-    if (types.length > 0 && !formData.programType) {
-      newErrors.programType = 'Program Type is required';
-    }
+    if (types.length > 0 && !formData.programType) newErrors.programType = 'Program Type is required';
 
-    if (!existingPatientId) {
+    if (!isPatientLocked && !existingPatientId) {
       if (!formData.fullName.trim()) newErrors.fullName = 'Full Name is required';
       if (!formData.age || isNaN(formData.age) || Number(formData.age) <= 0) newErrors.age = 'Valid age is required';
       if (!formData.gender) newErrors.gender = 'Gender is required';
       if (!formData.address.trim()) newErrors.address = 'Address is required';
-
       const phoneRegex = /^[0-9+\-\s()]{7,15}$/;
-      if (!formData.contactNumber.trim()) {
-        newErrors.contactNumber = 'Contact Number is required';
-      } else if (!phoneRegex.test(formData.contactNumber)) {
-        newErrors.contactNumber = 'Please enter a valid contact number';
-      }
+      if (!formData.contactNumber.trim()) newErrors.contactNumber = 'Contact Number is required';
+      else if (!phoneRegex.test(formData.contactNumber)) newErrors.contactNumber = 'Valid contact number required';
       if (!formData.category) newErrors.category = 'Category is required';
     }
 
-    if (formData.serviceProgram === 'Blood Letting') {
-      if (!formData.bloodType) newErrors.bloodType = 'Blood Type is required';
+    if (formData.serviceProgram === 'Blood Letting' && !formData.bloodType) {
+      newErrors.bloodType = 'Blood Type is required';
     }
 
     setErrors(newErrors);
@@ -127,23 +176,18 @@ const RegistrationForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
-
     setStatus('loading');
     setStatusMessage('');
 
-    // Prepare payload for backend
     const payload = {
       ...formData,
-      eventName: formData.serviceProgram, // mapping to backend expectations
-      serviceName: formData.programType,  // mapping to backend expectations
+      eventName: formData.serviceProgram,
+      serviceName: formData.programType,
       date: new Date().toISOString().split('T')[0],
-      time: new Date().toTimeString().split(' ')[0]
+      time: new Date().toTimeString().split(' ')[0],
     };
 
-    if (!navigator.onLine) {
-      saveToQueue(payload);
-      return;
-    }
+    if (!navigator.onLine) { saveToQueue(payload); return; }
 
     try {
       const response = await axios.post(APPS_SCRIPT_URL, payload, {
@@ -151,29 +195,27 @@ const RegistrationForm = () => {
       });
 
       if (response.data.success) {
-        setStatus('success');
-        setStatusMessage(existingPatientId ? 'Service added successfully!' : 'Registration successful!');
-        
-        // Keep service program but clear details
-        setFormData(prev => ({
-          ...prev,
-          fullName: existingPatientId ? prev.fullName : '',
-          age: existingPatientId ? prev.age : '',
-          gender: existingPatientId ? prev.gender : '',
-          address: existingPatientId ? prev.address : '',
-          contactNumber: existingPatientId ? prev.contactNumber : '',
-          category: existingPatientId ? prev.category : '',
-          bloodType: '',
-          lastDonationDate: '',
-          referredBy: ''
-        }));
+        const returnedId = response.data.id;
 
-        setTimeout(() => {
-          setStatus('idle');
-          setStatusMessage('');
-        }, 3000);
+        if (formData.action === 'registerAndAddService' && returnedId) {
+          // New patient — show ID card
+          setNewRegistrationId(returnedId);
+          setStatus('success');
+          setStatusMessage('Registration successful! Download the user ID card below.');
+        } else {
+          setStatus('success');
+          setStatusMessage('Service added successfully!');
+          // Reset for next user
+          setTimeout(() => {
+            setStatus('idle');
+            setStatusMessage('');
+            setFormData({ ...EMPTY_FORM });
+            setIsPatientLocked(false);
+            setScannedPatient(null);
+          }, 3000);
+        }
       } else {
-        throw new Error(response.data.error || 'Unknown error from server');
+        throw new Error(response.data.error || 'Unknown server error');
       }
     } catch (error) {
       console.error('Submission error:', error);
@@ -186,43 +228,141 @@ const RegistrationForm = () => {
     queue.push(data);
     localStorage.setItem('registrationQueue', JSON.stringify(queue));
     setStatus('offline');
-    setStatusMessage('You are offline. Registration saved and will submit when connected.');
+    setStatusMessage('You are offline. Registration saved and will sync when connected.');
+  };
+
+  const handleNextPatient = () => {
+    setFormData({ ...EMPTY_FORM });
+    setIsPatientLocked(false);
+    setScannedPatient(null);
+    setNewRegistrationId(null);
+    setStatus('idle');
+    setStatusMessage('');
   };
 
   const availableProgramTypes = getProgramTypes(formData.serviceProgram);
 
+  // ── If new registration was successful, show ID card screen
+  if (newRegistrationId) {
+    return (
+      <div className="w-full mx-auto">
+        <div className="glass-panel p-6 sm:p-8 rounded-2xl flex flex-col items-center gap-6 text-center">
+          <div className="flex items-center gap-2 text-green-600">
+            <CheckCircle2 size={24} />
+            <span className="font-headline font-semibold text-lg">{statusMessage}</span>
+          </div>
+          <PatientIDCard patientId={newRegistrationId} patientName={formData.fullName} />
+          <button
+            onClick={handleNextPatient}
+            className="mt-2 text-sm text-gray-500 hover:text-[var(--color-primary)] underline transition-colors"
+          >
+            Register another user
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full mx-auto">
-      {status === 'success' && (
-        <div className="mb-6 p-4 rounded-xl bg-green-50 border border-green-200 flex items-start gap-3 animate-fade-in">
+      {/* QR Scanner Modal */}
+      {showQRScanner && (
+        <QRScanner onScan={handleScan} onClose={() => setShowQRScanner(false)} />
+      )}
+
+      {/* Status Messages */}
+      {status === 'success' && !newRegistrationId && (
+        <div className="mb-4 p-4 rounded-xl bg-green-50 border border-green-200 flex items-start gap-3 animate-fade-in">
           <CheckCircle2 className="text-green-500 mt-0.5 shrink-0" />
           <div className="text-green-800 text-sm font-medium">{statusMessage}</div>
         </div>
       )}
-
       {status === 'offline' && (
-        <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3 animate-fade-in">
+        <div className="mb-4 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3 animate-fade-in">
           <WifiOff className="text-amber-500 mt-0.5 shrink-0" />
           <div className="text-amber-800 text-sm font-medium">{statusMessage}</div>
         </div>
       )}
-
       {status === 'error' && (
-        <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 animate-fade-in">
+        <div className="mb-4 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 animate-fade-in">
           <AlertCircle className="text-red-500 mt-0.5 shrink-0" />
           <div className="text-red-800 text-sm font-medium">{statusMessage}</div>
         </div>
       )}
 
       <form onSubmit={handleSubmit} noValidate className="glass-panel p-6 sm:p-8 rounded-2xl transition-all">
+
+        {/* ── SCAN BAR ── */}
+        <div className="flex flex-wrap items-center gap-2 mb-6 p-3 bg-gray-50 rounded-xl border border-gray-200">
+          {/* Left: status */}
+          <div className="flex items-center gap-2 mr-auto">
+            {isPatientLocked ? (
+              <div className="flex items-center gap-2 text-emerald-600">
+                <Lock size={16} />
+                <span className="text-sm font-medium font-body">
+                  Returning user: <span className="font-semibold">{scannedPatient?.fullName || formData.fullName}</span>
+                </span>
+              </div>
+            ) : (
+              <BarcodeListener onScan={handleScan} />
+            )}
+          </div>
+
+          {/* Middle: ID search (only when not locked) */}
+          {!isPatientLocked && (
+            <div className="flex items-center gap-1">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={manualId}
+                  onChange={(e) => setManualId(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleManualSearch(); }}}
+                  placeholder="Type User ID..."
+                  className="w-32 sm:w-40 pl-3 pr-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)] font-body transition-all"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleManualSearch}
+                className="p-1.5 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                title="Search User ID"
+              >
+                <Search size={15} className="text-gray-600" />
+              </button>
+            </div>
+          )}
+
+          {/* Right: actions */}
+          <div className="flex items-center gap-2">
+            {isPatientLocked && (
+              <button
+                type="button"
+                onClick={handleUnlock}
+                className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1 transition-colors"
+              >
+                <Unlock size={13} /> Not this user?
+              </button>
+            )}
+            {!isPatientLocked && (
+              <button
+                type="button"
+                onClick={() => setShowQRScanner(true)}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-[var(--color-primary)] text-white text-sm font-headline font-semibold rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+              >
+                <Camera size={15} />
+                Scan QR
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── TWO-COLUMN GRID ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-0">
-          
-          {/* LEFT COLUMN: Program Details & Blood Donation (if applicable) */}
+
+          {/* LEFT: Program Details + Blood Letting */}
           <div className="flex flex-col h-full">
-            {/* Step 1 & 2: Service Hierarchy */}
             <div className="mb-6 p-4 bg-[var(--color-primary)]/5 rounded-xl border border-[var(--color-primary)]/10">
               <h3 className="text-lg font-headline font-semibold text-[var(--color-primary)] mb-4">Program Details</h3>
-              
               <InputField
                 label="Service Program"
                 name="serviceProgram"
@@ -234,7 +374,6 @@ const RegistrationForm = () => {
                 required
                 placeholder="Select Program"
               />
-
               {availableProgramTypes.length > 0 && (
                 <InputField
                   label="Program Type"
@@ -250,11 +389,9 @@ const RegistrationForm = () => {
               )}
             </div>
 
-            {/* Step 4: Conditional Fields for Blood Letting */}
             {formData.serviceProgram === 'Blood Letting' && (
-              <div className="mb-6 p-4 bg-red-50 rounded-xl border border-red-100 flex-1">
+              <div className="mb-6 p-4 bg-red-50 rounded-xl border border-red-100">
                 <h3 className="text-lg font-headline font-semibold text-red-700 mb-4">Blood Donation Info</h3>
-                
                 <div className="flex gap-4">
                   <div className="w-1/2">
                     <InputField
@@ -279,7 +416,6 @@ const RegistrationForm = () => {
                     />
                   </div>
                 </div>
-
                 <InputField
                   label="Referred By"
                   name="referredBy"
@@ -291,13 +427,15 @@ const RegistrationForm = () => {
             )}
           </div>
 
-          {/* RIGHT COLUMN: Patient Details */}
+          {/* RIGHT: Patient Details */}
           <div className="flex flex-col h-full">
-            {/* Step 3: Patient Details */}
             <div className="mb-6 flex-1">
-              <h3 className="text-lg font-headline font-semibold text-[var(--color-text-headline)] mb-4">
-                {existingPatientId ? 'Patient Record (Locked)' : 'Patient Details'}
-              </h3>
+              <div className="flex items-center gap-2 mb-4">
+                <h3 className="text-lg font-headline font-semibold text-[var(--color-text-headline)]">
+                  {isPatientLocked ? 'User Record' : 'User Details'}
+                </h3>
+                {isPatientLocked && <Lock size={14} className="text-emerald-500" />}
+              </div>
 
               <InputField
                 label="Full Name"
@@ -305,8 +443,8 @@ const RegistrationForm = () => {
                 value={formData.fullName}
                 onChange={handleChange}
                 error={errors.fullName}
-                required={!existingPatientId}
-                disabled={!!existingPatientId}
+                required={!isPatientLocked && !existingPatientId}
+                disabled={isPatientLocked || !!existingPatientId}
                 placeholder="Juan Dela Cruz"
               />
 
@@ -319,8 +457,8 @@ const RegistrationForm = () => {
                     value={formData.age}
                     onChange={handleChange}
                     error={errors.age}
-                    required={!existingPatientId}
-                    disabled={!!existingPatientId}
+                    required={!isPatientLocked && !existingPatientId}
+                    disabled={isPatientLocked || !!existingPatientId}
                     placeholder="18"
                   />
                 </div>
@@ -333,8 +471,8 @@ const RegistrationForm = () => {
                     value={formData.gender}
                     onChange={handleChange}
                     error={errors.gender}
-                    required={!existingPatientId}
-                    disabled={!!existingPatientId}
+                    required={!isPatientLocked && !existingPatientId}
+                    disabled={isPatientLocked || !!existingPatientId}
                     placeholder="Select Gender"
                   />
                 </div>
@@ -346,49 +484,49 @@ const RegistrationForm = () => {
                 value={formData.address}
                 onChange={handleChange}
                 error={errors.address}
-                required={!existingPatientId}
-                disabled={!!existingPatientId}
+                required={!isPatientLocked && !existingPatientId}
+                disabled={isPatientLocked || !!existingPatientId}
                 placeholder="123 Main St, Brgy. San Jose"
               />
 
               <div className="flex gap-4">
-                 <div className="w-1/2">
-                    <InputField
-                      label="Contact Number"
-                      name="contactNumber"
-                      type="tel"
-                      value={formData.contactNumber}
-                      onChange={handleChange}
-                      error={errors.contactNumber}
-                      required={!existingPatientId}
-                      disabled={!!existingPatientId}
-                      placeholder="09123456789"
-                    />
-                 </div>
-                 <div className="w-1/2">
-                    <InputField
-                      label="Category"
-                      name="category"
-                      type="select"
-                      options={['Beneficiary', 'Volunteer', 'Sponsor', 'Staff', 'Other']}
-                      value={formData.category}
-                      onChange={handleChange}
-                      error={errors.category}
-                      required={!existingPatientId}
-                      disabled={!!existingPatientId}
-                      placeholder="Select Category"
-                    />
-                 </div>
+                <div className="w-1/2">
+                  <InputField
+                    label="Contact Number"
+                    name="contactNumber"
+                    type="tel"
+                    value={formData.contactNumber}
+                    onChange={handleChange}
+                    error={errors.contactNumber}
+                    required={!isPatientLocked && !existingPatientId}
+                    disabled={isPatientLocked || !!existingPatientId}
+                    placeholder="09123456789"
+                  />
+                </div>
+                <div className="w-1/2">
+                  <InputField
+                    label="Category"
+                    name="category"
+                    type="select"
+                    options={['Beneficiary', 'Volunteer', 'Sponsor', 'Staff', 'Other']}
+                    value={formData.category}
+                    onChange={handleChange}
+                    error={errors.category}
+                    required={!isPatientLocked && !existingPatientId}
+                    disabled={isPatientLocked || !!existingPatientId}
+                    placeholder="Select Category"
+                  />
+                </div>
               </div>
             </div>
 
             <div className="mt-auto pt-4">
               <SubmitButton isLoading={status === 'loading'} className="w-full">
-                {existingPatientId ? 'Add Service to Patient' : 'Submit Registration'}
+                {(isPatientLocked || existingPatientId) ? 'Add Service to User' : 'Submit Registration'}
               </SubmitButton>
             </div>
           </div>
-          
+
         </div>
       </form>
     </div>

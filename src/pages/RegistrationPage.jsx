@@ -34,7 +34,7 @@ const RegistrationPage = () => {
             Community Outreach
           </h2>
           <p className="mt-1 text-sm text-[var(--color-text-body)] max-w-lg font-body hidden sm:block">
-            Join our program by filling out the registration form below.
+           Join our program by filling out the form below, or scan / type a User ID to quickly add a service for a returning user.
           </p>
         </div>
       </div>

@@ -134,7 +134,7 @@ const PatientList = () => {
                   {displayCategory}
                 </h1>
                 <p className="text-sm font-body text-[var(--color-text-body)]">
-                  Patient List
+                  User List
                 </p>
               </div>
             </div>
@@ -173,7 +173,7 @@ const PatientList = () => {
                     onClick={() => handleSort('fullName')}
                   >
                     <div className="flex items-center gap-1">
-                      Patient Name
+                      User Name
                       <ArrowUpDown size={14} className={sortConfig.key === 'fullName' ? "text-[var(--color-primary)]" : "text-gray-400"} />
                     </div>
                   </th>
@@ -217,7 +217,7 @@ const PatientList = () => {
                 ) : sortedAndFilteredPatients.length === 0 ? (
                   <tr>
                     <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
-                      No patients found.
+                      No users found.
                     </td>
                   </tr>
                 ) : (

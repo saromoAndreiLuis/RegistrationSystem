@@ -7,11 +7,13 @@ import PatientList from './pages/PatientList';
 import PatientDetails from './pages/PatientDetails';
 import EventDetails from './pages/EventDetails';
 import { AppModeProvider } from './context/AppModeContext';
+import { PatientCacheProvider } from './context/PatientCacheContext';
 import ModeToggle from './components/ModeToggle';
 
 function App() {
   return (
     <AppModeProvider>
+      <PatientCacheProvider>
       <Router>
         <Routes>
           <Route path="/" element={<LandingPage />} />
@@ -23,6 +25,7 @@ function App() {
         </Routes>
         <ModeToggle />
       </Router>
+      </PatientCacheProvider>
     </AppModeProvider>
   );
 }

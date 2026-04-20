@@ -232,6 +232,20 @@ POST → Web App URL
 - **Improved Navigation:** All Back buttons now use browser history (`navigate(-1)`) instead of hardcoded paths.
 - **Easter Egg:** Added a cute Lighthouse animation triggered by the heart icon in Radiant Mode.
 
+### [v0.0.5] - 2026-04-20
+**Smart Scan Registration — "Scan, Don't Type."**
+- **User ID Card:** New registrations now generate a digital shareable ID card (PNG) with TGLFI branding, a QR code, and a Code-128 barcode. Users take this card to every outreach event.
+- **QR Camera Scan:** A "Scan QR" button at the top of the registration form opens a live camera viewfinder. Scanning a user's QR code auto-fills and locks their record instantly.
+- **USB Barcode Scanner Support:** The registration form passively listens for USB barcode scanner input at all times (no clicks required). Keystroke-timing heuristics distinguish scanner bursts from human typing.
+- **User ID Search:** A manual text input in the scan bar allows registrars to type a User ID directly and press Enter to look up a returning user — a third fallback alongside QR and barcode.
+- **Auto-fill & Lock:** On any successful scan or ID search, the user's details fill automatically and lock (grayed out). Only Service Program and Type remain editable — enabling a full service log in under 30 seconds.
+- **Patient Cache (Offline Support):** App fetches and caches the full user list in `localStorage` on load. All scan/search lookups resolve from cache — works even when internet drops at the event.
+- **Offline Queue:** Submissions made while offline are queued in `localStorage` and auto-synced when the connection restores.
+- **Terminology Rename:** All UI-facing "Patient" labels renamed to "User" across the entire application (form, list, ID card, buttons, error messages).
+- **Navigation Fix:** All Back buttons now use `navigate(-1)` (browser history) instead of hardcoded routes.
+- **VS Code Fix:** Added `.vscode/settings.json` to suppress false-positive `@theme` CSS warnings caused by Tailwind v4.
+
+
 **Author:** Andrei Saromo  
 **Version:** Agent-Optimized v3 (No Backend / Free Setup)
 

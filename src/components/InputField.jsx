@@ -10,12 +10,15 @@ const InputField = ({
   onChange, 
   error, 
   required = false,
+  disabled = false,
   placeholder = ''
 }) => {
-  const baseClasses = `w-full px-4 py-3 rounded-xl border focus:outline-none transition-all duration-200 ease-in-out font-body bg-white/50 backdrop-blur-sm
-    ${error 
-      ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200' 
-      : 'border-gray-200 focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 hover:border-gray-300'
+  const baseClasses = `w-full px-4 py-3 rounded-xl border focus:outline-none transition-all duration-200 ease-in-out font-body
+    ${disabled
+      ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed opacity-70'
+      : error 
+        ? 'bg-white/50 backdrop-blur-sm border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200' 
+        : 'bg-white/50 backdrop-blur-sm border-gray-200 focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 hover:border-gray-300'
     }`;
 
   return (
@@ -33,7 +36,8 @@ const InputField = ({
               name={name}
               value={value}
               onChange={onChange}
-              className={`${baseClasses} appearance-none cursor-pointer`}
+              disabled={disabled}
+              className={`${baseClasses} appearance-none ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
               required={required}
             >
               <option value="" disabled>{placeholder || 'Select an option'}</option>
@@ -57,6 +61,7 @@ const InputField = ({
             value={value}
             onChange={onChange}
             placeholder={placeholder}
+            disabled={disabled}
             className={baseClasses}
             required={required}
           />
@@ -70,7 +75,7 @@ const InputField = ({
       </div>
       
       {error && (
-        <span className="text-xs text-red-500 mt-1 font-body animate-pulse">{error}</span>
+        <span className="text-xs text-red-500 mt-1 font-body">{error}</span>
       )}
     </div>
   );
