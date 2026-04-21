@@ -19,7 +19,7 @@ function App() {
       <Router>
         <Navbar />
         <ShortcutHandler />
-        <div className="pt-0 sm:pt-0"> {/* Landing page handling */}
+        <div className="pb-20 sm:pb-0"> 
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/register" element={<RegistrationPage />} />

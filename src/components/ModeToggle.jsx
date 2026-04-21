@@ -8,7 +8,7 @@ const ModeToggle = () => {
   return (
     <button
       onClick={toggleMode}
-      className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2 rounded-full shadow-lg transition-all duration-300 font-headline font-semibold text-sm ${
+      className={`fixed bottom-24 sm:bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2 rounded-full shadow-lg transition-all duration-300 font-headline font-semibold text-sm ${
         mode === 'radiant' 
           ? 'bg-white text-[var(--color-primary)] border border-[var(--color-primary)]/20 hover:shadow-[0_8px_30px_rgb(67,142,130,0.3)]' 
           : 'bg-gray-800 text-gray-200 border border-gray-700 hover:bg-gray-700'

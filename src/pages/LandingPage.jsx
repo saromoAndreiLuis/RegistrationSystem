@@ -57,7 +57,7 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--color-neutral)] relative overflow-hidden flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[var(--color-neutral)] relative overflow-hidden flex flex-col justify-center py-12 pb-24 sm:pb-12 sm:px-6 lg:px-8">
       {/* Decorative background blobs */}
       <div className="absolute top-0 -left-4 w-72 h-72 bg-[var(--color-primary)] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
       <div className="absolute top-0 -right-4 w-72 h-72 bg-[var(--color-secondary)] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
