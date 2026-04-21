@@ -22,7 +22,7 @@ const LighthouseEasterEgg = ({ isActive, onClose }) => {
         setShow(false); 
         setTimeout(onClose, 1000); 
       }}
-      className={`fixed inset-0 z-50 transition-opacity duration-1000 ${show ? 'opacity-100 pointer-events-auto cursor-pointer' : 'opacity-0 pointer-events-none'}`}
+      className={`fixed inset-0 z-[200] transition-opacity duration-1000 ${show ? 'opacity-100 pointer-events-auto cursor-pointer' : 'opacity-0 pointer-events-none'}`}
     >
       {/* Dark overlay */}
       <div className="absolute inset-0 bg-[#0a0f1e]/70 backdrop-blur-[2px]" />

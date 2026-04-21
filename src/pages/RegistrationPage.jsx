@@ -7,7 +7,7 @@ const RegistrationPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-[var(--color-neutral)] relative overflow-hidden flex flex-col py-6 sm:py-8 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[var(--color-neutral)] pt-20 pb-12 relative overflow-hidden flex flex-col px-4 sm:px-6 lg:px-8">
       {/* Back Button */}
       <div className="absolute top-4 left-4 z-20">
         <button 

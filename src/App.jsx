@@ -8,21 +8,27 @@ import PatientDetails from './pages/PatientDetails';
 import EventDetails from './pages/EventDetails';
 import { AppModeProvider } from './context/AppModeContext';
 import { PatientCacheProvider } from './context/PatientCacheContext';
+import Navbar from './components/Navbar';
 import ModeToggle from './components/ModeToggle';
+import ShortcutHandler from './components/ShortcutHandler';
 
 function App() {
   return (
     <AppModeProvider>
       <PatientCacheProvider>
       <Router>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/register" element={<RegistrationPage />} />
-          <Route path="/admin" element={<DashboardPage />} />
-          <Route path="/admin/:category" element={<PatientList />} />
-          <Route path="/admin/:category/:patientId" element={<PatientDetails />} />
-          <Route path="/admin/:category/:patientId/event/:eventId" element={<EventDetails />} />
-        </Routes>
+        <Navbar />
+        <ShortcutHandler />
+        <div className="pt-0 sm:pt-0"> {/* Landing page handling */}
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/register" element={<RegistrationPage />} />
+            <Route path="/admin" element={<DashboardPage />} />
+            <Route path="/admin/:category" element={<PatientList />} />
+            <Route path="/admin/:category/:patientId" element={<PatientDetails />} />
+            <Route path="/admin/:category/:patientId/event/:eventId" element={<EventDetails />} />
+          </Routes>
+        </div>
         <ModeToggle />
       </Router>
       </PatientCacheProvider>

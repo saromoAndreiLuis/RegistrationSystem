@@ -246,8 +246,54 @@ POST → Web App URL
 - **VS Code Fix:** Added `.vscode/settings.json` to suppress false-positive `@theme` CSS warnings caused by Tailwind v4.
 
 
+### [v0.0.6] - 2026-04-21
+**Concurrency & Integrity Hardening — "The Beta Prep."**
+- **SyncToken (UUID) Generation:** Every submission now generates a unique `syncToken` the moment "Submit" is clicked. This token is persisted in the offline queue and prevents the server from creating duplicate records if a sync request is retried multiple times.
+- **Queue Throttling:** Implemented a 1-second delay between sync requests in the offline queue. This manages the "burst" load on Google Apps Script when multiple devices come back online simultaneously, reducing 429 errors.
+- **Server-Side Locking (Planned):** Prepared the architecture for `LockService.getPublicLock()` to ensure atomic writes during concurrent registrations.
+- **ID Padding:** All IDs are now consistently padded to 4 digits (e.g., `0001`) across the UI, ID cards, and CSV exports for better alignment with outreach standards.
+
+## App Hierarchy Documentation
+
+```text
+TGLFI SYSTEM HIERARCHY (v0.0.7)
+==============================
+[ROOT] App.jsx
+ ├── [CONTEXTS] 
+ │    ├── AppModeContext (Theme state)
+ │    └── PatientCacheContext (Global Data Storage - THE HEART)
+ ├── [COMPONENTS]
+ │    ├── Navbar (Global Navigation & Status)
+ │    └── ModeToggle (Theme Switcher)
+ └── [PAGES]
+      ├── / (LandingPage) -> [EasterEgg]
+      ├── /register (RegistrationPage) -> [RegistrationForm] -> [Scanner/USB]
+      ├── /admin (DashboardPage) -> [Quick Links]
+      ├── /admin/:category (PatientList) -> [Paginated Table + Export]
+      └── /admin/:category/:id (PatientDetails) -> [History Timeline + ID Card]
+
+BACKEND
+=======
+Google Apps Script (Code.gs) 
+ └── API: doPost (Writes) / doGet (Reads)
+      └── Storage: Google Sheets [Patients | History | SyncTokens]
+```
+
+### v0.0.7 Release Notes (Caching & Performance)
+- **Global Cache**: Implemented `PatientCacheContext` to store all patients and history in `localStorage`.
+- **Instant Nav**: User List and User Details now load instantly from the cache.
+- **Manual Refresh**: Added a refresh button to the Admin lists to force a sync with Google Sheets.
+- **Improved UX**: Reduced network overhead and improved offline reliability.
+
+### v0.0.8 Release Notes (The Power User Update)
+- **Skeleton UI**: Replaced loading spinners with ghost layouts. Radiant mode features a shimmer animation, while Speed mode uses a pulse effect.
+- **Keyboard Shortcuts**: Implemented global `Alt` key combinations (`Alt+N`, `Alt+D`, `Alt+R`, `Alt+F`) for lightning-fast navigation and data entry.
+- **Command Toasts**: Added real-time visual feedback for keyboard commands.
+- **Robust ID Matching**: Fixed profile lookup to handle leading zeros and numeric IDs correctly.
+- **Improved Date Formatting**: Implemented a safety wrapper to prevent "Invalid Date" errors from appearing in the UI.
+
 **Author:** Andrei Saromo  
-**Version:** Agent-Optimized v3 (No Backend / Free Setup)
+**Version:** Agent-Optimized v4 (Beta Ready / Power User Features)
 
 ---
 

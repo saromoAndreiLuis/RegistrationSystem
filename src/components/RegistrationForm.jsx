@@ -14,7 +14,7 @@ const SERVICE_PROGRAMS = ['CWOP', 'Blood Letting', 'Blood Extraction', 'General 
 
 const getProgramTypes = (service) => {
   switch (service) {
-    case 'CWOP': return ['Medical', 'Dental', 'Optical', 'Cervical', 'Hairstyle', 'Physical Therapy', 'OB-GYN', 'PEDIA', 'DERMA'];
+    case 'CWOP': return ['Medical', 'Dental', 'Optical', 'Cervical', 'Breast Cancer Screening', 'Laboratory', 'Hairstyle', 'Physical Therapy', 'OB-GYN', 'PEDIA', 'DERMA'];
     case 'Blood Letting': return ['Donor'];
     default: return [];
   }
@@ -37,6 +37,13 @@ const EMPTY_FORM = {
 };
 
 const padId = (id) => String(id || '').padStart(4, '0');
+
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 const RegistrationForm = () => {
   const [searchParams] = useSearchParams();
@@ -63,7 +70,24 @@ const RegistrationForm = () => {
   const [scannedPatient, setScannedPatient] = useState(null);
   const [newRegistrationId, setNewRegistrationId] = useState(null);
   const [manualId, setManualId] = useState('');
+  const [isProgramLocked, setIsProgramLocked] = useState(false);
+  const [selectedLabTests, setSelectedLabTests] = useState([]);
   const isProcessingQueue = React.useRef(false);
+
+  const labTestOptions = [
+    { id: 'bloodchem', label: 'Bloodchem' },
+    { id: 'cbc', label: 'CBC' },
+    { id: 'urinalysis', label: 'Urinalysis' },
+    { id: 'xray', label: 'X-Ray' }
+  ];
+
+  const toggleLabTest = (testLabel) => {
+    setSelectedLabTests(prev => 
+      prev.includes(testLabel) 
+        ? prev.filter(t => t !== testLabel) 
+        : [...prev, testLabel]
+    );
+  };
 
   // Offline queue processing
   useEffect(() => {
@@ -75,6 +99,22 @@ const RegistrationForm = () => {
       clearInterval(interval);
     };
   }, []);
+
+  // Handle program locking from URL
+  useEffect(() => {
+    const urlCategory = searchParams.get('category');
+    if (urlCategory && urlCategory !== 'general-registration') {
+      let programToLock = '';
+      if (urlCategory === 'wellness-outreach') programToLock = 'CWOP';
+      if (urlCategory === 'bloodletting') programToLock = 'Blood Letting';
+      if (urlCategory === 'blood-extraction') programToLock = 'Blood Extraction';
+      
+      if (programToLock) {
+        setFormData(prev => ({ ...prev, serviceProgram: programToLock }));
+        setIsProgramLocked(true);
+      }
+    }
+  }, [searchParams]);
 
   const processQueue = async () => {
     if (!navigator.onLine || isProcessingQueue.current) return;
@@ -99,6 +139,11 @@ const RegistrationForm = () => {
           timeout: 10000 // 10s timeout to avoid hanging
         });
         processedCount++;
+        
+        // Throttle: Wait 1 second between items to prevent server overload
+        if (toProcess.indexOf(data) < toProcess.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       } catch (err) {
         console.error('Queue item failed, re-queueing:', err);
         remainingQueue.push(data);
@@ -201,51 +246,77 @@ const RegistrationForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
-    setStatus('loading');
-    setStatusMessage('');
 
-    const payload = {
+    // Additional Laboratory validation
+    if (formData.serviceProgram === 'CWOP' && formData.programType === 'Laboratory' && selectedLabTests.length === 0) {
+      setErrors(prev => ({ ...prev, laboratory: 'Please select at least one laboratory test' }));
+      return;
+    }
+
+    setStatus('loading');
+    setStatusMessage('Connecting to database...');
+
+    const basePayload = {
       ...formData,
-      id: formData.patientId, // Added duplicate 'id' field for backend compatibility
+      id: formData.patientId,
       eventName: formData.serviceProgram,
-      serviceName: formData.programType,
       date: new Date().toISOString().split('T')[0],
       time: new Date().toTimeString().split(' ')[0],
     };
 
-    if (!navigator.onLine) { saveToQueue(payload); return; }
+    // Prepare list of payloads (split laboratory tests if applicable)
+    let payloads = [];
+    if (formData.serviceProgram === 'CWOP' && formData.programType === 'Laboratory') {
+      payloads = selectedLabTests.map(test => ({
+        ...basePayload,
+        serviceName: `LAB - ${test}`,
+        syncToken: generateUUID(),
+      }));
+    } else {
+      payloads = [{
+        ...basePayload,
+        serviceName: formData.programType,
+        syncToken: generateUUID(),
+      }];
+    }
+
+    if (!navigator.onLine) {
+      payloads.forEach(p => saveToQueue(p));
+      return;
+    }
 
     try {
-      const response = await axios.post(APPS_SCRIPT_URL, payload, {
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-      });
-
-      if (response.data.success) {
-        const returnedId = response.data.id;
-
-        if (formData.action === 'registerAndAddService' && returnedId) {
-          // New patient — show ID card
-          setNewRegistrationId(padId(returnedId));
-          setStatus('success');
-          setStatusMessage(`Registration successful! ID: ${padId(returnedId)}`);
+      let mainId = null;
+      for (const payload of payloads) {
+        const response = await axios.post(APPS_SCRIPT_URL, payload, {
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+        });
+        if (response.data.success) {
+          mainId = response.data.id;
         } else {
-          setStatus('success');
-          setStatusMessage('Service added successfully!');
-          // Reset for next user
-          setTimeout(() => {
-            setStatus('idle');
-            setStatusMessage('');
-            setFormData({ ...EMPTY_FORM });
-            setIsPatientLocked(false);
-            setScannedPatient(null);
-          }, 3000);
+          throw new Error(response.data.error || 'Server error');
         }
+      }
+
+      if (formData.action === 'registerAndAddService' && mainId) {
+        setNewRegistrationId(padId(mainId));
+        setStatus('success');
+        setStatusMessage(`Registration successful! ID: ${padId(mainId)}`);
       } else {
-        throw new Error(response.data.error || 'Unknown server error');
+        setStatus('success');
+        setStatusMessage('Service(s) added successfully!');
+        setTimeout(() => {
+          setStatus('idle');
+          setStatusMessage('');
+          setFormData({ ...EMPTY_FORM });
+          setIsPatientLocked(false);
+          setScannedPatient(null);
+          setSelectedLabTests([]);
+        }, 3000);
       }
     } catch (error) {
       console.error('Submission error:', error);
-      saveToQueue(payload);
+      payloads.forEach(p => saveToQueue(p));
     }
   };
 
@@ -398,6 +469,7 @@ const RegistrationForm = () => {
                 onChange={handleChange}
                 error={errors.serviceProgram}
                 required
+                disabled={isProgramLocked}
                 placeholder="Select Program"
               />
               {availableProgramTypes.length > 0 && (
@@ -412,6 +484,26 @@ const RegistrationForm = () => {
                   required
                   placeholder="Select Type"
                 />
+              )}
+
+              {formData.serviceProgram === 'CWOP' && formData.programType === 'Laboratory' && (
+                <div className="mt-4 p-4 bg-white/50 rounded-xl border border-[var(--color-primary)]/20 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <p className="text-sm font-semibold text-[var(--color-primary)] mb-3">Select Laboratory Tests:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {labTestOptions.map(test => (
+                      <label key={test.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 hover:border-[var(--color-primary)]/40 cursor-pointer transition-all shadow-sm">
+                        <input
+                          type="checkbox"
+                          className="w-5 h-5 rounded accent-[var(--color-primary)]"
+                          checked={selectedLabTests.includes(test.label)}
+                          onChange={() => toggleLabTest(test.label)}
+                        />
+                        <span className="text-sm font-medium text-gray-700">{test.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {errors.laboratory && <p className="text-xs text-red-500 mt-2">{errors.laboratory}</p>}
+                </div>
               )}
             </div>
 

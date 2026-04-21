@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { Clock, Plus, X, Loader2, AlertCircle } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Clock, Plus, X, Loader2, AlertCircle, ArrowLeft, ChevronRight } from 'lucide-react';
 import SubmitButton from '../components/SubmitButton';
 import InputField from '../components/InputField';
+import axios from 'axios';
 import { APPS_SCRIPT_URL } from '../config';
+import { usePatientCache } from '../context/PatientCacheContext';
 
 const AddServiceModal = ({ isOpen, onClose, onAdd, eventInfo, patientId }) => {
-
   const [formData, setFormData] = useState({
     serviceName: '',
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -21,7 +21,6 @@ const AddServiceModal = ({ isOpen, onClose, onAdd, eventInfo, patientId }) => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // We send action: addService to the Apps Script
     const payload = {
       action: 'addService',
       patientId: patientId,
@@ -39,7 +38,7 @@ const AddServiceModal = ({ isOpen, onClose, onAdd, eventInfo, patientId }) => {
       
       if (response.data.success) {
         onAdd({
-          id: "s" + Date.now(), // Local pseudo-id for key rendering
+          id: "s" + Date.now(),
           ...formData
         });
         setFormData({ ...formData, serviceName: '', remarks: '' });
@@ -55,8 +54,8 @@ const AddServiceModal = ({ isOpen, onClose, onAdd, eventInfo, patientId }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in">
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <h2 className="text-xl font-headline font-bold text-[var(--color-text-headline)]">Add New Service</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors" disabled={isSubmitting}>
@@ -99,90 +98,53 @@ const AddServiceModal = ({ isOpen, onClose, onAdd, eventInfo, patientId }) => {
 const EventDetails = () => {
   const { category, patientId, eventId } = useParams();
   const navigate = useNavigate();
-  const [patient, setPatient] = useState(null);
-  const [eventInfo, setEventInfo] = useState(null);
-  const [services, setServices] = useState([]);
+  const { findPatientById, getPatientHistory, loading, refreshCache } = usePatientCache();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const response = await axios.get(APPS_SCRIPT_URL);
-        if (response.data.success) {
-          const allPatients = response.data.data.patients || [];
-          const allHistory = response.data.data.history || [];
-          
-          const foundPatient = allPatients.find(p => String(p.id) === patientId);
-          if (foundPatient) setPatient(foundPatient);
-          
-          // Reconstruct event details from eventId (which is encodeURIComponent(`${eventName}_${date}`))
-          const decodedEventId = decodeURIComponent(eventId);
-          // Format is eventName_date.
-          const lastUnderscore = decodedEventId.lastIndexOf('_');
-          const evName = decodedEventId.substring(0, lastUnderscore);
-          const evDate = decodedEventId.substring(lastUnderscore + 1);
-          
-          setEventInfo({ eventName: evName, date: evDate });
-          
-          // Filter services for this event
-          const eventServices = allHistory.filter(h => 
-            String(h.patientId) === patientId && 
-            h.eventName === evName && 
-            String(h.date) === String(evDate)
-          );
-          
-          // Give them pseudo-IDs for keys and sort by time (assuming time is parseable, or just leave as is)
-          // The spec says "Sorted by time (latest first)". Since they are appended, reversing the array puts newest first.
-          const processedServices = eventServices.map((s, idx) => ({ ...s, id: 's' + idx })).reverse();
-          setServices(processedServices);
-          
-        } else {
-          throw new Error(response.data.error || 'Failed to fetch data');
-        }
-      } catch (err) {
-        console.error(err);
-        setError('Could not load data from Google Sheets.');
-      } finally {
-        setLoading(false);
-      }
+  const patient = findPatientById(patientId);
+  
+  const eventInfo = useMemo(() => {
+    const decodedEventId = decodeURIComponent(eventId);
+    const lastUnderscore = decodedEventId.lastIndexOf('_');
+    return {
+      eventName: decodedEventId.substring(0, lastUnderscore),
+      date: decodedEventId.substring(lastUnderscore + 1)
     };
-    fetchData();
-  }, [patientId, eventId]);
+  }, [eventId]);
 
-  const handleAddService = (newService) => {
-    // Add to top of list (latest first)
-    setServices([newService, ...services]);
-    setIsModalOpen(false);
+  const services = useMemo(() => {
+    return getPatientHistory(patientId)
+      .filter(h => h.eventName === eventInfo.eventName && String(h.date) === String(eventInfo.date))
+      .reverse();
+  }, [getPatientHistory, patientId, eventInfo]);
+
+  const handleBack = () => {
+    navigate(-1);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[var(--color-neutral)] py-8 px-4 flex items-center justify-center">
-        <Loader2 className="animate-spin text-[var(--color-primary)]" size={40} />
-      </div>
-    );
-  }
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'No Date';
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? dateStr : date.toLocaleDateString();
+  };
 
-  if (error || !eventInfo) {
+  if (loading && !patient) {
     return (
-      <div className="min-h-screen bg-[var(--color-neutral)] py-8 px-4 flex flex-col items-center justify-center">
-        <AlertCircle className="text-red-500 mb-4" size={48} />
-        <h2 className="text-xl font-headline font-bold mb-4">{error || "Event not found"}</h2>
-        <button onClick={() => navigate(-1)} className="text-[var(--color-primary)] underline cursor-pointer focus:outline-none">Back</button>
+      <div className="min-h-screen bg-[var(--color-neutral)] flex items-center justify-center">
+        <Loader2 className="animate-spin text-[var(--color-primary)]" size={48} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-neutral)] py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[var(--color-neutral)] pt-24 pb-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
-        <div className="text-sm font-medium text-gray-500 mb-6 flex items-center gap-2">
-          <button onClick={() => navigate(-1)} className="hover:text-[var(--color-primary)] transition-colors cursor-pointer focus:outline-none">Back</button>
-          <ChevronRight size={14} />
-          <span className="text-[var(--color-primary)]">Services</span>
+        <div className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-6">
+          <button onClick={handleBack} className="hover:text-[var(--color-primary)] transition-colors inline-flex items-center cursor-pointer focus:outline-none">
+            <ArrowLeft size={16} className="mr-1" /> Back
+          </button>
+          <ChevronRight size={14} className="text-gray-300" />
+          <span className="text-[var(--color-primary)]">Service Logs</span>
         </div>
 
         <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -190,37 +152,41 @@ const EventDetails = () => {
             <h1 className="text-2xl font-headline font-bold text-[var(--color-text-headline)]">
               {eventInfo.eventName}
             </h1>
-            <p className="text-sm font-body text-[var(--color-text-body)]">
-              {patient?.fullName || "Patient"} • {eventInfo.date ? new Date(eventInfo.date).toLocaleDateString() : 'Unknown'}
+            <p className="text-sm font-body text-gray-500">
+              {patient?.fullName || "Patient"} • {formatDate(eventInfo.date)}
             </p>
           </div>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 bg-[var(--color-primary)] text-white px-5 py-2.5 rounded-xl font-headline font-semibold hover:bg-[var(--color-primary-dark)] active:scale-95 transition-all shadow-sm hover:shadow"
+            className="inline-flex items-center gap-2 bg-[var(--color-primary)] text-white px-5 py-2.5 rounded-xl font-headline font-semibold hover:bg-[var(--color-primary-dark)] active:scale-95 transition-all shadow-md"
           >
             <Plus size={20} /> Add Service
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-1">
           {services.length === 0 ? (
-            <div className="p-12 text-center text-gray-500 bg-white border border-gray-200 rounded-2xl shadow-sm border-dashed">
-              No services logged for this event yet.
+            <div className="p-12 text-center text-gray-400 bg-white border border-gray-100 rounded-2xl border-dashed">
+              None
             </div>
           ) : (
-            services.map(service => (
-              <div key={service.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row justify-between gap-4 group hover:border-[var(--color-secondary)]/30 transition-colors">
-                <div>
-                  <h3 className="font-headline font-semibold text-[var(--color-text-headline)] text-lg mb-1">
-                    {service.serviceName}
-                  </h3>
-                  <div className="text-sm font-body text-gray-600 bg-gray-50 inline-block px-3 py-1 rounded-md border border-gray-100">
-                    <span className="font-medium text-gray-500">Remarks:</span> {service.remarks || "None"}
+            services.map((service, idx) => (
+              <div key={idx} className="bg-white p-6 border-b last:border-b-0 border-gray-100 flex flex-col sm:flex-row items-start sm:items-center gap-4 transition-colors hover:bg-gray-50/50">
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <h3 className="font-headline font-bold text-[var(--color-primary)] text-lg">
+                      [{service.serviceName}]
+                    </h3>
+                    <div className="h-4 w-px bg-gray-300 hidden sm:block" />
+                    <span className="text-sm font-mono text-gray-500 flex items-center gap-1.5">
+                      Time of input: <span className="font-bold text-gray-700">[{service.time || '00:00'}]</span>
+                    </span>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 text-sm font-mono text-[var(--color-primary)] bg-[var(--color-primary)]/5 px-3 py-1.5 rounded-lg h-fit">
-                  <Clock size={16} />
-                  {service.time}
+                  <div className="mt-2 pl-4 border-l-2 border-gray-100">
+                    <p className="text-sm font-body text-gray-600 italic">
+                      {service.remarks ? service.remarks : "No remarks."}
+                    </p>
+                  </div>
                 </div>
               </div>
             ))
@@ -231,16 +197,12 @@ const EventDetails = () => {
       <AddServiceModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        onAdd={handleAddService} 
+        onAdd={() => refreshCache()} 
         eventInfo={eventInfo}
         patientId={patientId}
       />
     </div>
   );
 };
-
-const ChevronRight = ({ size, className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>
-);
 
 export default EventDetails;
