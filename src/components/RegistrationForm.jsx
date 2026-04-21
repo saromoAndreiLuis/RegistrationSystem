@@ -280,21 +280,20 @@ const RegistrationForm = () => {
       }];
     }
 
-    if (!navigator.onLine) {
-      payloads.forEach(p => saveToQueue(p));
-      return;
-    }
-
+    // NETWORK-FIRST: We always try to hit the live database first.
+    // We only use the offline queue if the request actually fails or times out.
     try {
       let mainId = null;
       for (const payload of payloads) {
         const response = await axios.post(APPS_SCRIPT_URL, payload, {
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          timeout: 15000 // 15s timeout
         });
-        if (response.data.success) {
-          mainId = response.data.id;
+        
+        if (response && response.data && response.data.success) {
+          mainId = response.data.patientId || response.data.id;
         } else {
-          throw new Error(response.data.error || 'Server error');
+          throw new Error('Server returned failure');
         }
       }
 
@@ -315,7 +314,7 @@ const RegistrationForm = () => {
         }, 3000);
       }
     } catch (error) {
-      console.error('Submission error:', error);
+      console.warn('Live submission failed, saving to offline queue:', error);
       payloads.forEach(p => saveToQueue(p));
     }
   };

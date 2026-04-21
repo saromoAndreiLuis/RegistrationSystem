@@ -27,8 +27,6 @@ export const PatientCacheProvider = ({ children }) => {
   }, []);
 
   const refreshCache = useCallback(async () => {
-    if (!navigator.onLine) return;
-    
     setLoading(true);
     try {
       const response = await axios.get(APPS_SCRIPT_URL);
