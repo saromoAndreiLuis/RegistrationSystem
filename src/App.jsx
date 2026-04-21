@@ -11,16 +11,18 @@ import { PatientCacheProvider } from './context/PatientCacheContext';
 import Navbar from './components/Navbar';
 import ModeToggle from './components/ModeToggle';
 import ShortcutHandler from './components/ShortcutHandler';
+import FullscreenManager from './components/FullscreenManager';
 
 function App() {
   return (
     <AppModeProvider>
       <PatientCacheProvider>
-      <Router>
-        <Navbar />
-        <ShortcutHandler />
-        <div className="pb-20 sm:pb-0"> 
-          <Routes>
+      <FullscreenManager>
+        <Router>
+          <Navbar />
+          <ShortcutHandler />
+          <div className="pb-20 sm:pb-0"> 
+            <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/register" element={<RegistrationPage />} />
             <Route path="/admin" element={<DashboardPage />} />
@@ -31,6 +33,7 @@ function App() {
         </div>
         <ModeToggle />
       </Router>
+      </FullscreenManager>
       </PatientCacheProvider>
     </AppModeProvider>
   );
