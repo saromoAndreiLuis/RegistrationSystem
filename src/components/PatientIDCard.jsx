@@ -3,11 +3,13 @@ import { QRCodeCanvas } from 'qrcode.react';
 import JsBarcode from 'jsbarcode';
 import { Download } from 'lucide-react';
 
+const padId = (id) => String(id || '').replace(/^'+/, '').padStart(4, '0');
+
 const PatientIDCard = ({ patientId, patientName }) => {
   const barcodeCanvasRef = useRef(null);
   const cardRef = useRef(null);
 
-  const idString = String(patientId).replace(/^'+/, '');
+  const idString = padId(patientId);
 
   useEffect(() => {
     if (barcodeCanvasRef.current && idString) {

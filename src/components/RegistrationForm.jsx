@@ -36,6 +36,8 @@ const EMPTY_FORM = {
   patientId: ''
 };
 
+const padId = (id) => String(id || '').padStart(4, '0');
+
 const RegistrationForm = () => {
   const [searchParams] = useSearchParams();
   const existingPatientId = searchParams.get('patientId');
@@ -134,7 +136,7 @@ const RegistrationForm = () => {
       address: patient.address || '',
       contactNumber: patient.contactNumber || '',
       category: patient.category || '',
-      patientId: String(patient.id),
+      patientId: padId(patient.id),
       serviceProgram: '',
       programType: '',
     }));
@@ -204,6 +206,7 @@ const RegistrationForm = () => {
 
     const payload = {
       ...formData,
+      id: formData.patientId, // Added duplicate 'id' field for backend compatibility
       eventName: formData.serviceProgram,
       serviceName: formData.programType,
       date: new Date().toISOString().split('T')[0],
@@ -222,9 +225,9 @@ const RegistrationForm = () => {
 
         if (formData.action === 'registerAndAddService' && returnedId) {
           // New patient — show ID card
-          setNewRegistrationId(returnedId);
+          setNewRegistrationId(padId(returnedId));
           setStatus('success');
-          setStatusMessage('Registration successful! Download the user ID card below.');
+          setStatusMessage(`Registration successful! ID: ${padId(returnedId)}`);
         } else {
           setStatus('success');
           setStatusMessage('Service added successfully!');

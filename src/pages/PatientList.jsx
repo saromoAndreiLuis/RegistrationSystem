@@ -4,6 +4,8 @@ import axios from 'axios';
 import { Users, Search, ArrowLeft, MoreHorizontal, UserCircle2, ArrowUpDown, Plus, Loader2, AlertCircle, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { APPS_SCRIPT_URL } from '../config';
 
+const padId = (id) => String(id || '').padStart(4, '0');
+
 const PatientRow = ({ patient, category }) => {
   const navigate = useNavigate();
 
@@ -23,7 +25,7 @@ const PatientRow = ({ patient, category }) => {
         </div>
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
-        <div className="text-sm font-mono text-[var(--color-primary)]">{patient.id}</div>
+        <div className="text-sm font-mono text-[var(--color-primary)] font-bold">{padId(patient.id)}</div>
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
         <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -63,11 +65,42 @@ const PatientList = () => {
         const response = await axios.get(APPS_SCRIPT_URL);
         if (response.data.success) {
           const allPatients = response.data.data.patients || [];
-          const filteredByCategory = category === 'general-registration' 
-            ? allPatients 
-            : allPatients.filter(p => p.category && p.category.toLowerCase() === displayCategory.toLowerCase());
+          const allHistory = response.data.data.history || [];
+          
+          // Helper to normalize strings for comparison (e.g., "Blood Letting" -> "bloodletting")
+          const normalize = (str) => String(str || '').toLowerCase().replace(/[\s-]/g, '');
+          
+          // Expanded matching for abbreviations (e.g. Wellness Outreach matches CWOP)
+          const getPossibleMatches = (cat) => {
+            const norm = normalize(cat);
+            if (norm.includes('wellness') || norm === 'cwop') return ['wellnessoutreach', 'communitywellnessoutreachprogram', 'cwop'];
+            if (norm === 'bloodletting') return ['bloodletting'];
+            if (norm === 'bloodextraction') return ['bloodextraction'];
+            return [norm];
+          };
+
+          const targetNorms = getPossibleMatches(displayCategory);
+
+          let filtered;
+          if (category === 'general-registration') {
+            filtered = allPatients;
+          } else {
+            // 1. Find all Patient IDs from the History sheet who participated in this program
+            const participantIds = new Set(
+              allHistory
+                .filter(h => targetNorms.includes(normalize(h.eventName)))
+                .map(h => String(h.patientId))
+            );
+
+            // 2. Filter the master patients list
+            filtered = allPatients.filter(p => {
+              const matchesHistory = participantIds.has(String(p.id));
+              const matchesProfile = targetNorms.includes(normalize(p.category));
+              return matchesHistory || matchesProfile;
+            });
+          }
             
-          setPatients(filteredByCategory);
+          setPatients(filtered);
         } else {
           throw new Error(response.data.error || 'Failed to fetch data');
         }
@@ -95,7 +128,7 @@ const PatientList = () => {
     
     const headers = ['User ID', 'Full Name', 'Age', 'Gender', 'Address', 'Contact Number', 'Category', 'Status'];
     const rows = patients.map(p => [
-      p.id,
+      padId(p.id),
       p.fullName,
       p.age,
       p.gender,

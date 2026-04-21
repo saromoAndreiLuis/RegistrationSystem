@@ -5,6 +5,8 @@ import { UserCircle2, ArrowLeft, Calendar, ChevronRight, Loader2, AlertCircle, C
 import PatientIDCard from '../components/PatientIDCard';
 import { APPS_SCRIPT_URL } from '../config';
 
+const padId = (id) => String(id || '').padStart(4, '0');
+
 const EventItem = ({ event, category, patientId }) => {
   const navigate = useNavigate();
   return (
@@ -122,8 +124,8 @@ const PatientDetails = () => {
             <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 text-gray-500 font-body">
               <span className="flex items-center gap-2">
                 <span className="text-xs uppercase tracking-wider font-semibold text-gray-400">ID:</span>
-                <span className="font-mono text-[var(--color-primary)] font-medium bg-[var(--color-primary)]/10 px-2 py-0.5 rounded">
-                  {patient.id}
+                <span className="text-[var(--color-primary)] font-mono font-bold bg-[var(--color-primary)]/5 px-2 py-0.5 rounded border border-[var(--color-primary)]/10">
+                  {padId(patient.id)}
                 </span>
               </span>
               <span className="flex items-center gap-2">
@@ -184,7 +186,7 @@ const PatientDetails = () => {
             </button>
             <div className="flex flex-col items-center gap-4">
               <h3 className="text-xl font-headline font-bold text-gray-800">User Digital ID</h3>
-              <PatientIDCard patientId={patient.id} patientName={patient.fullName} />
+              <PatientIDCard patientId={padId(patient.id)} patientName={patient.fullName} />
               <p className="text-xs text-gray-400 text-center">
                 This ID can be scanned at any TGLFI outreach event for instant registration.
               </p>
