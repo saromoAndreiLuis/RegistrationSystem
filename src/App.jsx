@@ -12,6 +12,7 @@ import Navbar from './components/Navbar';
 import ModeToggle from './components/ModeToggle';
 import ShortcutHandler from './components/ShortcutHandler';
 import FullscreenManager from './components/FullscreenManager';
+import DevTools from './components/DevTools';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
       <FullscreenManager>
         <Router>
           <Navbar />
+          <DevTools />
           <ShortcutHandler />
           <div className="pb-20 sm:pb-0"> 
             <Routes>

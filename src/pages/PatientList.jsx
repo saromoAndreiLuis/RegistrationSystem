@@ -10,7 +10,7 @@ const PatientRow = ({ patient, category }) => {
   const navigate = useNavigate();
 
   return (
-    <tr 
+    <tr
       onClick={() => navigate(`/admin/${category}/${patient.id}`)}
       className="hover:bg-gray-50 cursor-pointer transition-colors group"
     >
@@ -28,9 +28,8 @@ const PatientRow = ({ patient, category }) => {
         <div className="text-sm font-mono text-[var(--color-primary)] font-bold">{padId(patient.id)}</div>
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
-        <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-          patient.status === 'inactive' ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800'
-        }`}>
+        <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${patient.status === 'inactive' ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800'
+          }`}>
           {patient.status || 'active'}
         </span>
       </td>
@@ -56,7 +55,7 @@ const PatientList = () => {
   // Smart Filtering Logic from Cache
   const filteredPatients = useMemo(() => {
     if (loading && allPatients.length === 0) return [];
-    
+
     const normalize = (str) => String(str || '').toLowerCase().replace(/[\s-]/g, '');
     const getPossibleMatches = (cat) => {
       const norm = normalize(cat);
@@ -87,8 +86,8 @@ const PatientList = () => {
 
     // Apply Search
     if (searchTerm) {
-      list = list.filter(p => 
-        p.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      list = list.filter(p =>
+        p.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         String(p.id).includes(searchTerm)
       );
     }
@@ -120,7 +119,7 @@ const PatientList = () => {
   return (
     <div className="min-h-screen bg-[var(--color-neutral)] pt-24 pb-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        
+
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded-xl">
@@ -135,8 +134,8 @@ const PatientList = () => {
           </div>
 
           <div className="flex items-center gap-2 w-full md:w-auto">
-            <button 
-              onClick={refreshCache} 
+            <button
+              onClick={refreshCache}
               disabled={loading}
               className="p-2.5 rounded-xl bg-white border border-gray-200 text-gray-500 hover:text-[var(--color-primary)] hover:border-[var(--color-primary)] transition-all disabled:opacity-50"
               title="Refresh Data"
@@ -189,7 +188,7 @@ const PatientList = () => {
               </tbody>
             </table>
           </div>
-          
+
           {filteredPatients.length === 0 && !loading && (
             <div className="py-20 text-center">
               <p className="text-gray-500 font-body">No users found matching your criteria.</p>
@@ -199,7 +198,7 @@ const PatientList = () => {
 
         {totalPages > 1 && (
           <div className="mt-6 flex justify-center items-center gap-2">
-            <button 
+            <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(prev => prev - 1)}
               className="p-2 rounded-lg border border-gray-200 disabled:opacity-30"
@@ -207,7 +206,7 @@ const PatientList = () => {
               <ChevronLeft size={20} />
             </button>
             <span className="text-sm font-medium text-gray-600">Page {currentPage} of {totalPages}</span>
-            <button 
+            <button
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage(prev => prev + 1)}
               className="p-2 rounded-lg border border-gray-200 disabled:opacity-30"

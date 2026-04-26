@@ -190,7 +190,7 @@ const PatientDetails = () => {
             >
               <X size={24} />
             </button>
-            <PatientIDCard patient={patient} />
+            <PatientIDCard patientId={patient.id} patientName={patient.fullName} />
           </div>
         </div>
       )}

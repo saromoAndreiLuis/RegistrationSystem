@@ -292,8 +292,23 @@ Google Apps Script (Code.gs)
 - **Robust ID Matching**: Fixed profile lookup to handle leading zeros and numeric IDs correctly.
 - **Improved Date Formatting**: Implemented a safety wrapper to prevent "Invalid Date" errors from appearing in the UI.
 
+### [v0.0.9] Release Notes (Network & Security Hardening)
+- **Batch Submission**: Implemented a robust batch-sync strategy for the offline queue. All queued records are now sent in a single optimized request, significantly reducing server overhead and 429 (Too Many Requests) errors.
+- **Kiosk Mode Lock**: Enforced a secure full-screen interface lock. The system now requires a "Launch & Lock" initialization to prevent accidental browser navigation and ensure a focused registration environment.
+- **Improved Sync Reliability**: Added a unique `syncToken` to every batch request to prevent duplicate data entries during unstable network conditions.
+- **Developer Tools**: Integrated a hidden Dev Mode panel for stress-testing data synchronization and simulating network outages during beta prep.
+- **Bug Fixes**: Resolved profile lookup issues where leading zeros in IDs were occasionally stripped.
+
+### [v0.1.0] Release Notes (Analytics & Premium UI)
+- **Program Dashboard**: Rebuilt the analytics hub to feature real-time overview graphs for total registrations, services logged, active programs, and database records.
+- **Dual-Mode Architecture**: The Dashboard now conditionally renders completely distinct UI layouts while sharing the exact same data-processing engine.
+  - **Radiant Mode**: Features a High-End SaaS aesthetic (glass panels, floating bento grids, HTML-based category progress bars, and custom background typography for trend charts). Strictly constrained to `100vh` to eliminate scrolling entirely.
+  - **Lite Mode**: Retains the clean, spacious, and traditional data visualization aesthetic using full Recharts components.
+- **Data Integrity Filtering**: Implemented strict validation checks in `PatientCacheContext` to automatically strip "ghost records" (empty rows) from Google Sheets, ensuring exact accuracy for dashboard metrics.
+- **Timezone Logic**: Fixed dashboard metrics to use local timezone date parsing rather than strict UTC strings, ensuring "Today" and "7-Day Trend" stats reflect accurately for the user.
+
 **Author:** Andrei Saromo  
-**Version:** Agent-Optimized v4 (Beta Ready / Power User Features)
+**Version:** Agent-Optimized v6 (v0.1.0 / Beta Ready)
 
 ---
 

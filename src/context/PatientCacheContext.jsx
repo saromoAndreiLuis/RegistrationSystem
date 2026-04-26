@@ -19,10 +19,16 @@ export const PatientCacheProvider = ({ children }) => {
     const storedHistory = localStorage.getItem('patientCache_history');
     const storedTimestamp = localStorage.getItem('patientCache_timestamp');
 
-    if (storedPatients) setPatients(JSON.parse(storedPatients));
-    if (storedHistory) setHistory(JSON.parse(storedHistory));
-    if (storedTimestamp) setLastUpdated(new Date(storedTimestamp));
-    
+    try {
+      if (storedPatients) setPatients(JSON.parse(storedPatients));
+      if (storedHistory) setHistory(JSON.parse(storedHistory));
+      if (storedTimestamp) setLastUpdated(new Date(storedTimestamp));
+    } catch (e) {
+      console.error('Failed to parse patient cache:', e);
+      localStorage.removeItem('patientCache_patients');
+      localStorage.removeItem('patientCache_history');
+    }
+
     setCacheLoaded(true);
   }, []);
 
@@ -70,13 +76,13 @@ export const PatientCacheProvider = ({ children }) => {
   };
 
   return (
-    <PatientCacheContext.Provider value={{ 
-      patients, 
-      history, 
-      loading, 
-      cacheLoaded, 
+    <PatientCacheContext.Provider value={{
+      patients,
+      history,
+      loading,
+      cacheLoaded,
       lastUpdated,
-      refreshCache, 
+      refreshCache,
       findPatientById,
       getPatientHistory
     }}>

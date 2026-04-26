@@ -1,181 +1,175 @@
 /**
- * Google Apps Script for Community Outreach Registration System
- * 
- * Instructions:
- * 1. Ensure you have two sheets (tabs) named: "Patients" and "History".
- * 2. "Patients" headers (Row 1): id, timestamp, fullName, age, gender, address, contactNumber, category, status
- * 3. "History" headers (Row 1): patientId, eventName, date, serviceName, time, remarks, bloodType, lastDonationDate, referredBy
+ * COMMUNITY OUTREACH REGISTRATION SYSTEM - BACKEND (v0.0.9)
+ * Efficiency Features: Batch Sync, Delta Sync, Concurrency Locking.
+ * Original Conventions: sync_tokens, patient_id.
  */
+
+const CONFIG = {
+  PATIENTS_SHEET: "patients",
+  HISTORY_SHEET: "history",
+  TOKENS_SHEET: "sync_tokens",
+  ID_PADDING: 4
+};
+
+function doGet(e) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const patientsSheet = ss.getSheetByName(CONFIG.PATIENTS_SHEET);
+    const historySheet = ss.getSheetByName(CONFIG.HISTORY_SHEET);
+
+    // Support for Delta Sync: If a timestamp is provided, we filter rows
+    const lastSync = e.parameter.since ? new Date(e.parameter.since) : null;
+
+    // Use getDisplayValues to preserve 0001 format
+    const patientsRaw = patientsSheet.getDataRange().getDisplayValues();
+    const historyRaw = historySheet.getDataRange().getDisplayValues();
+
+    let patients = mapRows(patientsRaw);
+    let history = mapRows(historyRaw);
+
+    // If Delta Sync is requested, only return rows newer than lastSync
+    if (lastSync) {
+      patients = patients.filter(p => new Date(p.timestamp || 0) > lastSync);
+      history = history.filter(h => new Date(h.timestamp || h.date || 0) > lastSync);
+    }
+
+    return createJsonResponse({ 
+      success: true, 
+      data: { patients, history },
+      server_time: new Date().toISOString()
+    });
+  } catch (err) {
+    return createJsonResponse({ success: false, error: err.toString() });
+  }
+}
 
 function doPost(e) {
   const lock = LockService.getScriptLock();
-  lock.tryLock(10000);
-
   try {
-    const doc = SpreadsheetApp.getActiveSpreadsheet();
-    const patientsSheet = doc.getSheetByName("Patients");
-    const historySheet = doc.getSheetByName("History");
-
-    if (!patientsSheet || !historySheet) {
-      return ContentService.createTextOutput(JSON.stringify({ 
-        success: false, 
-        error: "Sheets 'Patients' or 'History' not found. Please ensure both tabs exist." 
-      })).setMimeType(ContentService.MimeType.JSON);
+    lock.waitLock(30000);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const contents = JSON.parse(e.postData.contents);
+    
+    // Support for BATCH SYNC (v0.0.9 Feature)
+    if (contents.action === "batch_sync" && Array.isArray(contents.payloads)) {
+      const results = contents.payloads.map(payload => {
+        if (payload.syncToken && isDuplicate(ss, payload.syncToken)) return { success: true, message: "Duplicate" };
+        const res = processAction(ss, payload);
+        if (res.success && payload.syncToken) logSyncToken(ss, payload.syncToken);
+        return res;
+      });
+      return createJsonResponse({ success: true, results });
     }
 
-    const data = JSON.parse(e.postData.contents);
-    const action = data.action || 'registerPatient'; // default action
-
-    // Helper to generate new patient ID
-    const generateNewId = () => {
-      const lastRow = patientsSheet.getLastRow();
-      const nextIdNum = lastRow; // Assuming row 1 is header
-      return "'" + String(nextIdNum).padStart(4, '0');
-    };
-
-    // Helper to add patient record
-    const appendPatientRecord = (id) => {
-      const timestamp = new Date().toISOString();
-      const status = "active"; // Default status
-      
-      patientsSheet.appendRow([
-        id,
-        timestamp,
-        data.fullName || "",
-        data.age || "",
-        data.gender || "",
-        data.address || "",
-        data.contactNumber || "",
-        data.category || "",
-        status
-      ]);
-    };
-
-    // Helper to add history record
-    const appendHistoryRecord = (patientId) => {
-      historySheet.appendRow([
-        patientId,
-        data.eventName || "",
-        data.date || "",
-        data.serviceName || "",
-        data.time || "",
-        data.remarks || "",
-        data.bloodType || "",
-        data.lastDonationDate || "",
-        data.referredBy || ""
-      ]);
-    };
-
-    if (action === 'registerPatient') {
-      const id = generateNewId();
-      appendPatientRecord(id);
-
-      return ContentService.createTextOutput(JSON.stringify({ 
-        success: true, 
-        id: id,
-        message: "Registration successful" 
-      })).setMimeType(ContentService.MimeType.JSON);
-
-    } else if (action === 'addService') {
-      if (!data.patientId) {
-        return ContentService.createTextOutput(JSON.stringify({ 
-          success: false, 
-          error: "Missing required field: patientId" 
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
-      
-      appendHistoryRecord(data.patientId);
-
-      return ContentService.createTextOutput(JSON.stringify({ 
-        success: true, 
-        message: "Service logged successfully" 
-      })).setMimeType(ContentService.MimeType.JSON);
-      
-    } else if (action === 'registerAndAddService') {
-      // Create Patient
-      const id = generateNewId();
-      appendPatientRecord(id);
-      
-      // Remove leading quote for History sheet reference if preferred, but it's safe to keep
-      const cleanId = id.replace("'", "");
-      
-      // Create History/Service Event
-      appendHistoryRecord(cleanId);
-
-      return ContentService.createTextOutput(JSON.stringify({ 
-        success: true, 
-        id: cleanId,
-        message: "Registration and Service logged successfully" 
-      })).setMimeType(ContentService.MimeType.JSON);
-
-    } else {
-      return ContentService.createTextOutput(JSON.stringify({ 
-        success: false, 
-        error: "Unknown action" 
-      })).setMimeType(ContentService.MimeType.JSON);
+    // Standard Single Action
+    if (contents.syncToken && isDuplicate(ss, contents.syncToken)) {
+      return createJsonResponse({ success: true, message: "Duplicate suppressed" });
     }
 
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ 
-      success: false, 
-      error: error.toString() 
-    })).setMimeType(ContentService.MimeType.JSON);
+    const result = processAction(ss, contents);
+    if (result.success && contents.syncToken) logSyncToken(ss, contents.syncToken);
+
+    return createJsonResponse(result);
+  } catch (err) {
+    return createJsonResponse({ success: false, error: err.toString() });
   } finally {
     lock.releaseLock();
   }
 }
 
-function doGet(e) {
-  try {
-    const doc = SpreadsheetApp.getActiveSpreadsheet();
-    const patientsSheet = doc.getSheetByName("Patients");
-    const historySheet = doc.getSheetByName("History");
-
-    if (!patientsSheet || !historySheet) {
-      return ContentService.createTextOutput(JSON.stringify({ 
-        success: false, 
-        error: "Sheets 'Patients' or 'History' not found. Please ensure both tabs exist." 
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // Helper to read sheet to array of objects
-    const readSheet = (sheet) => {
-      const dataRange = sheet.getDataRange();
-      const values = dataRange.getValues();
-      if (values.length <= 1) return [];
-      const headers = values[0];
-      return values.slice(1).map(row => {
-        const rowObject = {};
-        headers.forEach((header, index) => {
-          rowObject[header] = row[index];
-        });
-        return rowObject;
-      });
-    };
-
-    const patients = readSheet(patientsSheet);
-    const history = readSheet(historySheet);
-
-    return ContentService.createTextOutput(JSON.stringify({ 
-      success: true, 
-      data: {
-        patients: patients,
-        history: history
-      }
-    })).setMimeType(ContentService.MimeType.JSON);
-
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ 
-      success: false, 
-      error: error.toString() 
-    })).setMimeType(ContentService.MimeType.JSON);
+function processAction(ss, data) {
+  if (data.action === "register" || data.action === "registerAndAddService") {
+    return handleRegistration(ss, data);
+  } else if (data.action === "addService") {
+    return handleAddService(ss, data);
   }
+  return { success: false, error: "Invalid action" };
 }
 
-function doOptions(e) {
-  return ContentService.createTextOutput("")
-    .setMimeType(ContentService.MimeType.TEXT)
-    .setHeader("Access-Control-Allow-Origin", "*")
-    .setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-    .setHeader("Access-Control-Allow-Headers", "Content-Type");
+function handleRegistration(ss, data) {
+  const sheet = ss.getSheetByName(CONFIG.PATIENTS_SHEET);
+  const rows = sheet.getDataRange().getValues();
+  
+  let maxId = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const val = parseInt(rows[i][0], 10);
+    if (!isNaN(val)) maxId = Math.max(maxId, val);
+  }
+  const nextId = String(maxId + 1).padStart(CONFIG.ID_PADDING, '0');
+
+  const newRow = [
+    "'" + nextId,
+    data.fullName,
+    data.age,
+    data.gender,
+    data.address,
+    data.contactNumber,
+    data.category,
+    new Date().toISOString(), // ISO Timestamp for Delta Sync
+    "active"
+  ];
+  
+  sheet.appendRow(newRow);
+  
+  if (data.action === "registerAndAddService") {
+    data.patientId = nextId;
+    handleAddService(ss, data);
+  }
+
+  return { success: true, patientId: nextId };
+}
+
+function handleAddService(ss, data) {
+  const sheet = ss.getSheetByName(CONFIG.HISTORY_SHEET);
+  const logs = Array.isArray(data.logs) ? data.logs : [data];
+
+  logs.forEach(log => {
+    const pid = log.patientId || log.id;
+    const row = [
+      "'" + pid,
+      log.eventName,
+      log.date || new Date().toISOString().split('T')[0],
+      log.serviceName,
+      log.time || new Date().toLocaleTimeString(),
+      log.remarks || "",
+      new Date().toISOString() // ISO Timestamp for Delta Sync
+    ];
+    sheet.appendRow(row);
+  });
+
+  return { success: true };
+}
+
+function isDuplicate(ss, token) {
+  let sheet = ss.getSheetByName(CONFIG.TOKENS_SHEET);
+  if (!sheet) return false;
+  const values = sheet.getDataRange().getValues();
+  for (let i = 0; i < values.length; i++) {
+    if (values[i][0] === token) return true;
+  }
+  return false;
+}
+
+function logSyncToken(ss, token) {
+  let sheet = ss.getSheetByName(CONFIG.TOKENS_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.TOKENS_SHEET);
+    sheet.appendRow(["token", "timestamp"]);
+  }
+  sheet.appendRow([token, new Date().toISOString()]);
+}
+
+function mapRows(raw) {
+  if (raw.length < 2) return [];
+  const headers = raw[0];
+  return raw.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = row[i]);
+    return obj;
+  });
+}
+
+function createJsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }

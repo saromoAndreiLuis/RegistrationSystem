@@ -117,49 +117,52 @@ const RegistrationForm = () => {
   }, [searchParams]);
 
   const processQueue = async () => {
-    if (!navigator.onLine || isProcessingQueue.current) return;
+    if (isProcessingQueue.current) return;
     
-    const queue = JSON.parse(localStorage.getItem('registrationQueue') || '[]');
+    let queue = [];
+    try {
+      queue = JSON.parse(localStorage.getItem('registrationQueue') || '[]');
+    } catch (e) {
+      console.error('Failed to parse registration queue:', e);
+      localStorage.setItem('registrationQueue', '[]');
+    }
+    
     if (queue.length === 0) return;
 
     isProcessingQueue.current = true;
-    const remainingQueue = [];
-    let processedCount = 0;
+    setStatus('loading');
+    setStatusMessage(`Syncing ${queue.length} offline records...`);
 
-    // Create a local copy to process so we don't interfere with new items being added
-    const toProcess = [...queue];
-    // Clear the storage immediately so if user submits something NEW during this process, 
-    // it starts a fresh queue. We will add back failures later.
-    localStorage.setItem('registrationQueue', JSON.stringify([]));
-
-    for (const data of toProcess) {
-      try {
-        await axios.post(APPS_SCRIPT_URL, data, { 
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          timeout: 10000 // 10s timeout to avoid hanging
-        });
-        processedCount++;
-        
-        // Throttle: Wait 1 second between items to prevent server overload
-        if (toProcess.indexOf(data) < toProcess.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      } catch (err) {
-        console.error('Queue item failed, re-queueing:', err);
-        remainingQueue.push(data);
+    try {
+      // DEV MODE: Simulated Outage
+      if (window.__FORCE_OFFLINE__) {
+        throw new Error('SIMULATED_OFFLINE: Dev Mode Active');
       }
-    }
 
-    // Merge failed items back into any NEW items that might have been added to the queue
-    const currentQueue = JSON.parse(localStorage.getItem('registrationQueue') || '[]');
-    localStorage.setItem('registrationQueue', JSON.stringify([...remainingQueue, ...currentQueue]));
-    
-    isProcessingQueue.current = false;
+      // v0.0.9 BATCH SYNC: Send all items in one go
+      const response = await axios.post(APPS_SCRIPT_URL, {
+        action: 'batch_sync',
+        payloads: queue
+      }, { 
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        timeout: 30000 
+      });
 
-    if (processedCount > 0 && status !== 'loading') {
-      setStatus('success');
-      setStatusMessage(`Synced ${processedCount} offline registration(s).`);
-      setTimeout(() => setStatus('idle'), 5000);
+      if (response.data.success) {
+        localStorage.setItem('registrationQueue', JSON.stringify([]));
+        setStatus('success');
+        setStatusMessage(`Successfully synced ${queue.length} records!`);
+        setTimeout(() => setStatus('idle'), 5000);
+      } else {
+        throw new Error(response.data.error || 'Batch sync failed');
+      }
+    } catch (err) {
+      console.error('Batch sync failed:', err);
+      // Keep items in queue for next attempt
+      setStatus('error');
+      setStatusMessage('Sync failed. Will retry later.');
+    } finally {
+      isProcessingQueue.current = false;
     }
   };
 
@@ -281,8 +284,12 @@ const RegistrationForm = () => {
     }
 
     // NETWORK-FIRST: We always try to hit the live database first.
-    // We only use the offline queue if the request actually fails or times out.
     try {
+      // DEV MODE: Simulated Outage
+      if (window.__FORCE_OFFLINE__) {
+        throw new Error('SIMULATED_OFFLINE: Dev Mode Active');
+      }
+
       let mainId = null;
       for (const payload of payloads) {
         const response = await axios.post(APPS_SCRIPT_URL, payload, {
