@@ -90,17 +90,24 @@ function handleRegistration(ss, data) {
   const sheet = ss.getSheetByName(CONFIG.PATIENTS_SHEET);
   const rows = sheet.getDataRange().getValues();
   
-  let maxId = 0;
-  for (let i = 1; i < rows.length; i++) {
-    const val = parseInt(rows[i][0], 10);
-    if (!isNaN(val)) maxId = Math.max(maxId, val);
+  let nextId;
+  if (data.providedId) {
+    nextId = data.providedId;
+  } else {
+    let maxId = 0;
+    for (let i = 1; i < rows.length; i++) {
+      const val = parseInt(rows[i][0], 10);
+      if (!isNaN(val)) maxId = Math.max(maxId, val);
+    }
+    nextId = String(maxId + 1).padStart(CONFIG.ID_PADDING, '0');
   }
-  const nextId = String(maxId + 1).padStart(CONFIG.ID_PADDING, '0');
 
   const newRow = [
     "'" + nextId,
     new Date().toISOString(), // ISO Timestamp for Delta Sync
-    data.fullName,
+    data.firstName,
+    data.surname,
+    data.birthDate,
     data.age,
     data.gender,
     data.address,

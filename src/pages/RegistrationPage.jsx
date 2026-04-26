@@ -1,10 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, ArrowLeft } from 'lucide-react';
+import { Home, ArrowLeft, RefreshCw } from 'lucide-react';
 import RegistrationForm from '../components/RegistrationForm';
+import { usePatientCache } from '../context/PatientCacheContext';
 
 const RegistrationPage = () => {
   const navigate = useNavigate();
+  const { refreshCache, lastUpdated, loading: isCacheLoading } = usePatientCache();
 
   return (
     <div className="min-h-screen bg-[var(--color-neutral)] pt-20 pb-12 relative overflow-hidden flex flex-col px-4 sm:px-6 lg:px-8">
@@ -23,19 +25,39 @@ const RegistrationPage = () => {
       <div className="absolute top-0 -right-4 w-72 h-72 bg-[var(--color-secondary)] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
       <div className="absolute -bottom-8 left-20 w-72 h-72 bg-[var(--color-tertiary)] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
 
-      <div className="relative z-10 sm:mx-auto sm:w-full max-w-5xl mb-4 px-4 flex flex-col sm:flex-row items-center justify-center gap-4 text-center sm:text-left mt-10 sm:mt-0">
-        <div className="inline-flex items-center justify-center w-12 h-12 shrink-0 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] shadow-sm">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-          </svg>
+      <div className="relative z-10 sm:mx-auto sm:w-full max-w-5xl mb-4 px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left mt-10 sm:mt-0">
+        <div className="flex items-center gap-4">
+          <div className="inline-flex items-center justify-center w-12 h-12 shrink-0 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] shadow-sm hidden sm:flex">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-headline font-extrabold text-[var(--color-text-headline)] tracking-tight">
+              Community Outreach
+            </h2>
+            <p className="mt-1 text-sm text-[var(--color-text-body)] max-w-lg font-body hidden sm:block">
+             Join our program by filling out the form below, or scan / type a User ID to quickly add a service for a returning user.
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-headline font-extrabold text-[var(--color-text-headline)] tracking-tight">
-            Community Outreach
-          </h2>
-          <p className="mt-1 text-sm text-[var(--color-text-body)] max-w-lg font-body hidden sm:block">
-           Join our program by filling out the form below, or scan / type a User ID to quickly add a service for a returning user.
-          </p>
+
+        {/* Tiny Live Registry Pill */}
+        <div className="flex items-center gap-2 bg-white/60 backdrop-blur-sm border border-gray-200 py-1.5 px-3 rounded-full shadow-sm">
+          {lastUpdated && (
+             <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:block">
+               Synced: {new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+             </span>
+          )}
+          <button 
+            type="button"
+            onClick={refreshCache} 
+            disabled={isCacheLoading}
+            className="text-gray-500 hover:text-[var(--color-primary)] transition-all disabled:opacity-50 focus:outline-none"
+            title="Refresh Live Cache"
+          >
+            <RefreshCw size={14} className={isCacheLoading ? 'animate-spin text-[var(--color-primary)]' : ''} />
+          </button>
         </div>
       </div>
 

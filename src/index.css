@@ -90,3 +90,48 @@
   0% { transform: translateX(-50%) rotate(-40deg); }
   100% { transform: translateX(-50%) rotate(40deg); }
 }
+
+/* ==========================================================================
+   THERMAL PRINT TARGETING (Phase 4)
+   ========================================================================== */
+@media print {
+  /* Hide everything by default */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* Reset margins and backgrounds for strict print area */
+  @page {
+    margin: 0;
+    size: auto;
+  }
+  
+  /* Only show the ID Card content */
+  .print-area, .print-area * {
+    visibility: visible;
+  }
+  
+  /* Position the print area perfectly at top left without scaling issues */
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100vw !important;
+    height: 100vh !important;
+    transform: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* Force hide UI wrappers */
+  nav, .glass-panel, button, .lucide {
+    display: none !important;
+  }
+}

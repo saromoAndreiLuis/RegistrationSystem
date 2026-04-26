@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ClipboardList, Home, Wifi, WifiOff } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Home, Wifi, WifiOff, CloudUpload } from 'lucide-react';
 import { APP_VERSION } from '../config';
+import { useSyncQueue } from '../hooks/useSyncQueue';
 
 const Navbar = () => {
   const location = useLocation();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const queueLength = useSyncQueue();
 
   useEffect(() => {
     const handleStatus = () => setIsOnline(navigator.onLine);
@@ -70,6 +72,12 @@ const Navbar = () => {
 
             {/* Version & Status */}
             <div className="flex items-center gap-4">
+              {queueLength > 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200 shadow-sm animate-pulse">
+                  <CloudUpload size={12} />
+                  <span>{queueLength} Pending</span>
+                </div>
+              )}
               <div className={`hidden md:flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-colors ${
                 isOnline ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'
               }`}>

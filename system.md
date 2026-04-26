@@ -44,8 +44,10 @@ Client (React) → Apps Script Web App → Google Sheets
 
 ### 3.1 Registration Module (CRITICAL)
 Fields (STRICT):
-- fullName (string)
-- age (number)
+- firstName (string)
+- surname (string)
+- birthDate (string - YYYY-MM-DD)
+- age (number - auto-calculated)
 - gender (string)
 - address (string)
 - contactNumber (string)
@@ -55,7 +57,7 @@ Requirements:
 - Fast input UI
 - Client-side validation
 - POST request to Apps Script
-- Instant success/failure feedback
+- Instant success/failure feedback (Optimistic UI)
 
 ---
 
@@ -66,7 +68,9 @@ POST → Web App URL
 
 ### Request Body (JSON)
 {
-  "fullName": "string",
+  "firstName": "string",
+  "surname": "string",
+  "birthDate": "string",
   "age": number,
   "gender": "string",
   "address": "string",
@@ -86,13 +90,15 @@ POST → Web App URL
 ### Google Sheets Columns (ORDER MUST MATCH)
 1. id
 2. timestamp
-3. fullName
-4. age
-5. gender
-6. address
-7. contactNumber
-8. category
-9. status
+3. firstName
+4. surname
+5. birthDate
+6. age
+7. gender
+8. address
+9. contactNumber
+10. category
+11. status
 
 ### Rules
 - id: UUID generated in Apps Script
@@ -307,9 +313,15 @@ Google Apps Script (Code.gs)
   - **Lite Mode**: Retains the clean, spacious, and traditional data visualization aesthetic using full Recharts components.
 - **Data Integrity Filtering**: Implemented strict validation checks in `PatientCacheContext` to automatically strip "ghost records" (empty rows) from Google Sheets, ensuring exact accuracy for dashboard metrics.
 - **Timezone Logic**: Fixed dashboard metrics to use local timezone date parsing rather than strict UTC strings, ensuring "Today" and "7-Day Trend" stats reflect accurately for the user.
+### [v0.1.1] Release Notes (Field Ops & Smart Demographics)
+- **Zero-Delay Optimistic UI**: Registration submissions are now completely non-blocking. The UI instantly generates a local sequential ID, displays the success screen, and quietly pushes the data to a background queue, eliminating all network waiting time for staff.
+- **PWA Kiosk Installation**: The system is now installable as a Progressive Web App (PWA). Launching from the tablet home screen enforces a strict standalone view, disabling the address bar and back buttons.
+- **Smart Alias Search**: If staff cannot scan a QR code, they can now type an auto-generated alias (e.g. `ASAROMO2004`) directly into the search bar. The system dynamically matches this against the cache using `[First Initial] + [Surname] + [Birth Year]`.
+- **Thermal Barcode Integration**: Added a "Print ID Card" button on the success screen that opens a Print Preview Modal. It includes an invisible `@media print` CSS layer that strips all UI elements and perfectly scales the barcode for thermal label printers.
+- **Demographics Upgrade**: The database schema was upgraded to split "Full Name" into `firstName` and `surname`, and added a native `birthDate` picker. The `age` field is now strictly auto-calculated and locked to prevent data entry errors.
+- **Live Sync Monitor**: Added a global "Live Registry Cache" pill to the dashboard and registration headers, showing the exact time of the last sync and providing a 1-click manual refresh tool.
 
 **Author:** Andrei Saromo  
-**Version:** Agent-Optimized v6 (v0.1.0 / Beta Ready)
+**Version:** Agent-Optimized v7 (v0.1.1 / Field Operations Ready)
 
 ---
-

@@ -87,7 +87,7 @@ const CategoryCard = ({ title, icon: Icon, colorClass, to, count }) => (
 
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const { patients, history, loading, refreshCache } = usePatientCache();
+  const { patients, history, loading, refreshCache, lastUpdated } = usePatientCache();
   const { mode } = useAppMode();
   const currentYear = new Date().getFullYear();
 
@@ -160,31 +160,31 @@ const DashboardPage = () => {
 
   const radiantProgramData = [
     {
-      title: "Wellness",
+      title: "Community Wellness Outreach Program",
       desc: "Holistic physical and mental health workshops.",
       tag: "Active", tagColor: "text-[var(--color-primary)]",
-      imgSrc: "https://lh3.googleusercontent.com/aida-public/AB6AXuAeP0zkdAs3jT5R26IHy3z5IxZxgvasfYzeIDzCWSADq5i1saiDJoFPQ2c7_9hNXDRsCyIyhJ75kTh7n1DJQVH7EQibt8XoYasPue0dr133KbIua3BcVAWAv7TUoa_saLQhEnyuYnbmjofgI7NZPhnOTZfQs2Uz5bqkvJv-78f0NvgX48kW1yb69CMU3FW1q3WuR_dZ5HuLyGUhgvBaZSXaWAuzRy8_WsHMoFL-NvMq9qUITU2FNnRjij37qDsBOp4Vjz5rnlAdBlbQ",
+      imgSrc: "/Event Icons/CWOP/_2470103.JPG",
       to: "/admin/wellness-outreach", count: stats.programCounts.wellness
     },
     {
       title: "Bloodletting",
       desc: "Bi-weekly community blood drive events.",
       tag: "Critical", tagColor: "text-red-500",
-      imgSrc: "https://lh3.googleusercontent.com/aida-public/AB6AXuBEdveFoGbAZ_9V0rTgD21xmBO2vuIT1WzfB6a0oZ3ivnJCvIbsjoSzicFh6p6AFXQAICx-JiY6jZ5CUhA210biGRGpaY_-oyos4XPexLl2QA02huEH_Wu_en-yQy1CHWTXLQCqcOJlI1uMkepTtQ8_e9teb3-Hb15x5rTmOQ1dDfx8OKkgGdMW9Yi-usymKy2V2YN6WuJaXIMcG4LqiVRhP0tjQn2VDv-yh-YY0Xz-zmDNInDTw9jawzrmud6MueUvEwrxRwRSRrkw",
+      imgSrc: "/Event Icons/Bloodletting/_1622591.JPG",
       to: "/admin/bloodletting", count: stats.programCounts.bloodletting
     },
     {
-      title: "Extraction",
+      title: "Blood Extraction",
       desc: "Mobile dental clinic services for suburbs.",
       tag: "Scheduled", tagColor: "text-blue-500",
-      imgSrc: "https://lh3.googleusercontent.com/aida-public/AB6AXuDVWxBkcTYdtv2a6Gj8_4TT6_gxUoEGk_srqS3vfsNT1KFVH_KO7Q0MMPp4JI_rj4fVfxBOaTyZcWHUHiGnQE3z94XJ8E7KAB34g6MUTa_426KFQpVQNQ41VytLhoayr4EOx5JnC582_fYKGEKi0OZBdDdXlWD6Spmuzgcik5ETTMoG3dkJPhEx-3wfbvXGQ2kTxmo9NymbVLWt20_l42Kf9x2Uja0BRHyFCcWYz5ByXTSTiViLUBURaYfObQJSMYlrliMBLDuaopX0",
+      imgSrc: "/Event Icons/Blood Extraction/Screenshot 2026-04-26 201539.png",
       to: "/admin/blood-extraction", count: stats.programCounts.extraction
     },
     {
-      title: "General",
+      title: "General Instructions",
       desc: "Walk-in checkups and basic health consultations.",
       tag: "Standard", tagColor: "text-amber-600",
-      imgSrc: "https://lh3.googleusercontent.com/aida-public/AB6AXuAXW1LjWHxwbiTdRyJcus8uycUDtt86qK1McG0xjz7MfUw6upUHkojc3B1HdwSmcBKf8tqaC4zUjElQM7xoM36LP7mEF9Q8vR9j2_ATK6AGS23a2zLf_YUpLLhF4JcW4ZtiO13gGsvuaKEoYmPbjB-6O0d31vJSh6vwBlXPNIqcLd_SeHnF2pj9sc-9SWQGbDBOCxu9aNIUNrxgtlRwqEaRRnfNhUfawjgpNxv0AWuRYP_8yXK2ZgYX1XhjS0QELOeBzOSMb5EuDnbE",
+      imgSrc: "/Event Icons/General Registration/_1877516.JPG",
       to: "/admin/general-registration", count: stats.programCounts.general
     }
   ];
@@ -193,7 +193,7 @@ const DashboardPage = () => {
     { title: "Community Wellness Outreach Program", icon: HeartPulse, colorClass: "bg-rose-100 text-rose-600", to: "/admin/wellness-outreach", count: stats.programCounts.wellness },
     { title: "Bloodletting", icon: Droplets, colorClass: "bg-red-100 text-red-600", to: "/admin/bloodletting", count: stats.programCounts.bloodletting },
     { title: "Blood Extraction", icon: Syringe, colorClass: "bg-blue-100 text-blue-600", to: "/admin/blood-extraction", count: stats.programCounts.extraction },
-    { title: "General Registration", icon: Users, colorClass: "bg-emerald-100 text-emerald-600", to: "/admin/general-registration", count: stats.programCounts.general }
+    { title: "General Instructions", icon: Users, colorClass: "bg-emerald-100 text-emerald-600", to: "/admin/general-registration", count: stats.programCounts.general }
   ];
 
   const headerContent = (isRadiant) => (
@@ -208,21 +208,28 @@ const DashboardPage = () => {
           </p>
         )}
       </div>
-      <div className="flex items-center gap-2">
-        <button 
-          onClick={refreshCache} 
-          disabled={loading}
-          className={`rounded-xl bg-white shadow-sm text-gray-400 hover:text-[var(--color-primary)] transition-all disabled:opacity-50 flex items-center justify-center ${isRadiant ? 'p-2' : 'p-2.5 border border-gray-100'}`}
-          title="Refresh Dashboard"
-        >
-          <RefreshCw size={isRadiant ? 16 : 18} className={loading ? 'animate-spin' : ''} />
-        </button>
-        <div className={`bg-white shadow-sm flex items-center gap-2 ${isRadiant ? 'px-3 py-1.5 rounded-lg' : 'px-4 py-2 border border-gray-100 rounded-xl'}`}>
-          <div className={`w-2 h-2 rounded-full ${loading ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
-          <span className={`font-bold text-gray-500 uppercase tracking-wider ${isRadiant ? 'text-[10px]' : 'text-xs'}`}>
-            {loading ? 'Syncing...' : 'Live'}
-          </span>
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={refreshCache} 
+            disabled={loading}
+            className={`rounded-xl bg-white shadow-sm text-gray-400 hover:text-[var(--color-primary)] transition-all disabled:opacity-50 flex items-center justify-center ${isRadiant ? 'p-2' : 'p-2.5 border border-gray-100'}`}
+            title="Refresh Dashboard"
+          >
+            <RefreshCw size={isRadiant ? 16 : 18} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <div className={`bg-white shadow-sm flex items-center gap-2 ${isRadiant ? 'px-3 py-1.5 rounded-lg' : 'px-4 py-2 border border-gray-100 rounded-xl'}`}>
+            <div className={`w-2 h-2 rounded-full ${loading ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
+            <span className={`font-bold text-gray-500 uppercase tracking-wider ${isRadiant ? 'text-[10px]' : 'text-xs'}`}>
+              {loading ? 'Syncing...' : 'Live'}
+            </span>
+          </div>
         </div>
+        {lastUpdated && (
+          <span className="text-[9px] text-gray-400 font-medium">
+            Last Synced: {new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
       </div>
     </div>
   );

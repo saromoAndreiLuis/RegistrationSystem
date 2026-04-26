@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
-import { CheckCircle2, AlertCircle, WifiOff, Camera, Lock, Unlock, Search } from 'lucide-react';
+import { CheckCircle2, AlertCircle, WifiOff, Camera, Lock, Unlock, Search, Printer, RefreshCw } from 'lucide-react';
 import InputField from './InputField';
 import SubmitButton from './SubmitButton';
 import QRScanner from './QRScanner';
 import PatientIDCard from './PatientIDCard';
 import BarcodeListener from './BarcodeListener';
+import PrintPreviewModal from './PrintPreviewModal';
 import { APPS_SCRIPT_URL } from '../config';
 import { usePatientCache } from '../context/PatientCacheContext';
 
@@ -24,7 +25,9 @@ const EMPTY_FORM = {
   action: 'registerAndAddService',
   serviceProgram: '',
   programType: '',
-  fullName: '',
+  firstName: '',
+  surname: '',
+  birthDate: '',
   age: '',
   gender: '',
   address: '',
@@ -48,12 +51,14 @@ const generateUUID = () => {
 const RegistrationForm = () => {
   const [searchParams] = useSearchParams();
   const existingPatientId = searchParams.get('patientId');
-  const { findPatientById } = usePatientCache();
+  const { findPatientById, patients, refreshCache, lastUpdated, loading: isCacheLoading } = usePatientCache();
 
   const [formData, setFormData] = useState({
     ...EMPTY_FORM,
     action: existingPatientId ? 'addService' : 'registerAndAddService',
-    fullName: searchParams.get('fullName') || '',
+    firstName: searchParams.get('firstName') || '',
+    surname: searchParams.get('surname') || '',
+    birthDate: searchParams.get('birthDate') || '',
     age: searchParams.get('age') || '',
     gender: searchParams.get('gender') || '',
     address: searchParams.get('address') || '',
@@ -72,6 +77,7 @@ const RegistrationForm = () => {
   const [manualId, setManualId] = useState('');
   const [isProgramLocked, setIsProgramLocked] = useState(false);
   const [selectedLabTests, setSelectedLabTests] = useState([]);
+  const [showPrintModal, setShowPrintModal] = useState(false);
   const isProcessingQueue = React.useRef(false);
 
   const labTestOptions = [
@@ -167,10 +173,21 @@ const RegistrationForm = () => {
   };
 
   const handleScan = useCallback((scannedId) => {
-    const patient = findPatientById(scannedId);
+    let patient = findPatientById(scannedId);
+    
+    // Alias Search Fallback (e.g. ASAROMO2004)
+    if (!patient && patients) {
+      const upperScan = String(scannedId).toUpperCase();
+      patient = patients.find(p => {
+        if (!p.firstName || !p.surname || !p.birthDate) return false;
+        const alias = `${p.firstName.charAt(0).toUpperCase()}${p.surname.toUpperCase()}${p.birthDate.split('-')[0]}`;
+        return alias === upperScan;
+      });
+    }
+
     if (!patient) {
       setStatus('error');
-      setStatusMessage(`User ID "${scannedId}" not found. Please register as a new user.`);
+      setStatusMessage(`User ID or Code "${scannedId}" not found.`);
       setTimeout(() => setStatus('idle'), 4000);
       return;
     }
@@ -178,7 +195,9 @@ const RegistrationForm = () => {
     setFormData(prev => ({
       ...prev,
       action: 'addService',
-      fullName: patient.fullName || '',
+      firstName: patient.firstName || '',
+      surname: patient.surname || '',
+      birthDate: patient.birthDate || '',
       age: patient.age || '',
       gender: patient.gender || '',
       address: patient.address || '',
@@ -189,11 +208,11 @@ const RegistrationForm = () => {
       programType: '',
     }));
     setIsPatientLocked(true);
-    setScannedPatient({ id: patient.id, fullName: patient.fullName });
+    setScannedPatient({ id: patient.id, fullName: `${patient.firstName} ${patient.surname}`.trim() });
     setManualId('');
     setStatus('idle');
     setStatusMessage('');
-  }, [findPatientById]);
+  }, [findPatientById, patients]);
 
   const handleManualSearch = () => {
     const trimmed = manualId.trim();
@@ -213,11 +232,27 @@ const RegistrationForm = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'serviceProgram') {
-      setFormData(prev => ({ ...prev, [name]: value, programType: '' }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
+    
+    setFormData(prev => {
+      const nextState = { ...prev };
+      if (name === 'serviceProgram') {
+        nextState.serviceProgram = value;
+        nextState.programType = '';
+      } else {
+        nextState[name] = value;
+      }
+      
+      // Auto-calculate age if birthDate changes
+      if (name === 'birthDate' && value) {
+        const birthYear = new Date(value).getFullYear();
+        const currentYear = new Date().getFullYear();
+        const ageCalc = currentYear - birthYear;
+        nextState.age = ageCalc >= 0 ? String(ageCalc) : '';
+      }
+      
+      return nextState;
+    });
+
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
@@ -228,8 +263,10 @@ const RegistrationForm = () => {
     if (types.length > 0 && !formData.programType) newErrors.programType = 'Program Type is required';
 
     if (!isPatientLocked && !existingPatientId) {
-      if (!formData.fullName.trim()) newErrors.fullName = 'Full Name is required';
-      if (!formData.age || isNaN(formData.age) || Number(formData.age) <= 0) newErrors.age = 'Valid age is required';
+      if (!formData.firstName.trim()) newErrors.firstName = 'First Name is required';
+      if (!formData.surname.trim()) newErrors.surname = 'Surname is required';
+      if (!formData.birthDate) newErrors.birthDate = 'Birth Date is required';
+      if (!formData.age || isNaN(formData.age) || Number(formData.age) < 0) newErrors.age = 'Valid age required';
       if (!formData.gender) newErrors.gender = 'Gender is required';
       if (!formData.address.trim()) newErrors.address = 'Address is required';
       const phoneRegex = /^[0-9+\-\s()]{7,15}$/;
@@ -250,24 +287,29 @@ const RegistrationForm = () => {
     e.preventDefault();
     if (!validate()) return;
 
-    // Additional Laboratory validation
     if (formData.serviceProgram === 'CWOP' && formData.programType === 'Laboratory' && selectedLabTests.length === 0) {
       setErrors(prev => ({ ...prev, laboratory: 'Please select at least one laboratory test' }));
       return;
     }
 
-    setStatus('loading');
-    setStatusMessage('Connecting to database...');
+    let assignedId = formData.patientId;
+    if (formData.action === 'registerAndAddService') {
+      const queue = JSON.parse(localStorage.getItem('registrationQueue') || '[]');
+      const pendingNewCount = queue.filter(q => q.action === 'registerAndAddService' || q.action === 'register').length;
+      const maxLocalId = patients.reduce((max, p) => Math.max(max, parseInt(String(p.id).replace(/^'+/, ''), 10) || 0), 0);
+      assignedId = padId(maxLocalId + pendingNewCount + 1);
+    }
 
     const basePayload = {
       ...formData,
-      id: formData.patientId,
+      id: assignedId,
+      providedId: assignedId,
+      patientId: assignedId,
       eventName: formData.serviceProgram,
       date: new Date().toISOString().split('T')[0],
       time: new Date().toTimeString().split(' ')[0],
     };
 
-    // Prepare list of payloads (split laboratory tests if applicable)
     let payloads = [];
     if (formData.serviceProgram === 'CWOP' && formData.programType === 'Laboratory') {
       payloads = selectedLabTests.map(test => ({
@@ -283,46 +325,32 @@ const RegistrationForm = () => {
       }];
     }
 
-    // NETWORK-FIRST: We always try to hit the live database first.
-    try {
-      // DEV MODE: Simulated Outage
-      if (window.__FORCE_OFFLINE__) {
-        throw new Error('SIMULATED_OFFLINE: Dev Mode Active');
-      }
+    // OPTIMISTIC UI: Save instantly to offline queue
+    const queue = JSON.parse(localStorage.getItem('registrationQueue') || '[]');
+    payloads.forEach(p => queue.push(p));
+    localStorage.setItem('registrationQueue', JSON.stringify(queue));
 
-      let mainId = null;
-      for (const payload of payloads) {
-        const response = await axios.post(APPS_SCRIPT_URL, payload, {
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          timeout: 15000 // 15s timeout
-        });
-        
-        if (response && response.data && response.data.success) {
-          mainId = response.data.patientId || response.data.id;
-        } else {
-          throw new Error('Server returned failure');
-        }
-      }
+    // Trigger Success UI immediately
+    if (formData.action === 'registerAndAddService') {
+      setNewRegistrationId(assignedId);
+      setStatus('success');
+      setStatusMessage(`Registration successful! ID: ${assignedId}`);
+    } else {
+      setStatus('success');
+      setStatusMessage('Service(s) added successfully!');
+      setTimeout(() => {
+        setStatus('idle');
+        setStatusMessage('');
+        setFormData({ ...EMPTY_FORM });
+        setIsPatientLocked(false);
+        setScannedPatient(null);
+        setSelectedLabTests([]);
+      }, 3000);
+    }
 
-      if (formData.action === 'registerAndAddService' && mainId) {
-        setNewRegistrationId(padId(mainId));
-        setStatus('success');
-        setStatusMessage(`Registration successful! ID: ${padId(mainId)}`);
-      } else {
-        setStatus('success');
-        setStatusMessage('Service(s) added successfully!');
-        setTimeout(() => {
-          setStatus('idle');
-          setStatusMessage('');
-          setFormData({ ...EMPTY_FORM });
-          setIsPatientLocked(false);
-          setScannedPatient(null);
-          setSelectedLabTests([]);
-        }, 3000);
-      }
-    } catch (error) {
-      console.warn('Live submission failed, saving to offline queue:', error);
-      payloads.forEach(p => saveToQueue(p));
+    // Try background sync asynchronously
+    if (navigator.onLine) {
+      processQueue();
     }
   };
 
@@ -355,12 +383,30 @@ const RegistrationForm = () => {
             <span className="font-headline font-semibold text-lg">{statusMessage}</span>
           </div>
           <PatientIDCard patientId={newRegistrationId} patientName={formData.fullName} />
-          <button
-            onClick={handleNextPatient}
-            className="mt-2 text-sm text-gray-500 hover:text-[var(--color-primary)] underline transition-colors"
-          >
-            Register another user
-          </button>
+          
+          <div className="flex flex-col sm:flex-row gap-3 w-full mt-4">
+            <button
+              onClick={() => setShowPrintModal(true)}
+              className="flex-1 py-3 px-4 bg-[var(--color-primary)] text-white text-sm font-bold rounded-xl shadow-lg hover:bg-[var(--color-primary-dark)] transition-colors flex items-center justify-center gap-2"
+            >
+              <Printer size={18} />
+              Print ID Card
+            </button>
+            <button
+              onClick={handleNextPatient}
+              className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-200 transition-colors"
+            >
+              Next Patient
+            </button>
+          </div>
+
+          {showPrintModal && (
+            <PrintPreviewModal 
+              patientId={newRegistrationId} 
+              patientName={formData.fullName} 
+              onClose={() => setShowPrintModal(false)} 
+            />
+          )}
         </div>
       </div>
     );
@@ -368,6 +414,7 @@ const RegistrationForm = () => {
 
   return (
     <div className="w-full mx-auto">
+
       {/* QR Scanner Modal */}
       {showQRScanner && (
         <QRScanner onScan={handleScan} onClose={() => setShowQRScanner(false)} />
@@ -561,32 +608,63 @@ const RegistrationForm = () => {
                 {isPatientLocked && <Lock size={14} className="text-emerald-500" />}
               </div>
 
-              <InputField
-                label="Full Name"
-                name="fullName"
-                value={formData.fullName}
-                onChange={handleChange}
-                error={errors.fullName}
-                required={!isPatientLocked && !existingPatientId}
-                disabled={isPatientLocked || !!existingPatientId}
-                placeholder="Juan Dela Cruz"
-              />
+              <div className="flex gap-4 mb-4">
+                <div className="w-1/2">
+                  <InputField
+                    label="First Name"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    error={errors.firstName}
+                    required={!isPatientLocked && !existingPatientId}
+                    disabled={isPatientLocked || !!existingPatientId}
+                    placeholder="Juan"
+                  />
+                </div>
+                <div className="w-1/2">
+                  <InputField
+                    label="Surname"
+                    name="surname"
+                    value={formData.surname}
+                    onChange={handleChange}
+                    error={errors.surname}
+                    required={!isPatientLocked && !existingPatientId}
+                    disabled={isPatientLocked || !!existingPatientId}
+                    placeholder="Dela Cruz"
+                  />
+                </div>
+              </div>
 
               <div className="flex gap-4">
-                <div className="w-1/3">
+                <div className="w-1/2">
                   <InputField
-                    label="Age"
+                    label="Birth Date"
+                    name="birthDate"
+                    type="date"
+                    value={formData.birthDate}
+                    onChange={handleChange}
+                    error={errors.birthDate}
+                    required={!isPatientLocked && !existingPatientId}
+                    disabled={isPatientLocked || !!existingPatientId}
+                  />
+                </div>
+                <div className="w-1/2">
+                  <InputField
+                    label="Age (Auto)"
                     name="age"
                     type="number"
                     value={formData.age}
-                    onChange={handleChange}
+                    onChange={() => {}} // Read-only
                     error={errors.age}
                     required={!isPatientLocked && !existingPatientId}
-                    disabled={isPatientLocked || !!existingPatientId}
-                    placeholder="18"
+                    disabled={true}
+                    placeholder="Auto-calculated"
                   />
                 </div>
-                <div className="w-2/3">
+              </div>
+
+              <div className="flex gap-4 mt-4">
+                <div className="w-full">
                   <InputField
                     label="Gender"
                     name="gender"
