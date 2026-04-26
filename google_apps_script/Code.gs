@@ -99,13 +99,13 @@ function handleRegistration(ss, data) {
 
   const newRow = [
     "'" + nextId,
+    new Date().toISOString(), // ISO Timestamp for Delta Sync
     data.fullName,
     data.age,
     data.gender,
     data.address,
     data.contactNumber,
     data.category,
-    new Date().toISOString(), // ISO Timestamp for Delta Sync
     "active"
   ];
   

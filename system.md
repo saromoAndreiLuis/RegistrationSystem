@@ -92,6 +92,7 @@ POST → Web App URL
 6. address
 7. contactNumber
 8. category
+9. status
 
 ### Rules
 - id: UUID generated in Apps Script
