@@ -1,12 +1,74 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Printer, X, Settings2 } from 'lucide-react';
-import PatientIDCard from './PatientIDCard';
+import JsBarcode from 'jsbarcode';
+import { QRCodeSVG } from 'qrcode.react';
+
+const padId = (id) => String(id || '').replace(/^'+/, '').padStart(4, '0');
+
+const ThermalLabel = ({ patientId, patientName }) => {
+  const barcodeRef = useRef(null);
+  const idString = padId(patientId);
+
+  useEffect(() => {
+    if (barcodeRef.current && idString) {
+      try {
+        JsBarcode(barcodeRef.current, idString, {
+          format: 'CODE128',
+          width: 2,
+          height: 35,
+          displayValue: false,
+          margin: 0,
+          background: '#ffffff',
+          lineColor: '#000000',
+        });
+      } catch (e) {
+        console.error('Barcode generation error:', e);
+      }
+    }
+  }, [idString]);
+
+  return (
+    <div className="thermal-label-container bg-white border border-gray-300 shadow-sm flex flex-col justify-center items-center p-2" style={{ width: '50mm', height: '30mm' }}>
+      <div className="text-center w-full font-sans flex flex-col items-center">
+        <h1 className="text-[12px] font-bold text-black leading-tight truncate mb-1" style={{ maxWidth: '100%' }}>
+          {patientName}
+        </h1>
+        
+        <div className="flex justify-center items-center gap-3 w-full">
+          <div className="flex flex-col items-center">
+             <QRCodeSVG value={idString} size={38} level="M" />
+             <span className="text-[6px] font-bold text-gray-600 uppercase mt-[1px]">QR Code</span>
+          </div>
+          <div className="flex flex-col items-center">
+             <svg ref={barcodeRef} className="max-w-full h-auto" style={{ maxHeight: '11mm' }}></svg>
+             <span className="text-[6px] font-bold text-gray-600 uppercase mt-[1px]">Barcode</span>
+          </div>
+        </div>
+        
+        <p className="text-[10px] font-bold text-black font-mono leading-tight mt-0.5">
+          ID: {idString}
+        </p>
+      </div>
+    </div>
+  );
+};
 
 const PrintPreviewModal = ({ patientId, patientName, onClose }) => {
-  const [saveSettings, setSaveSettings] = useState(
-    localStorage.getItem('print_save_settings') === 'true'
-  );
+  const [autoPrint] = useState(localStorage.getItem('print_save_settings') === 'true');
+  const [saveSettings, setSaveSettings] = useState(autoPrint);
   
+  useEffect(() => {
+    if (autoPrint) {
+      // Small delay to ensure the SVG barcode renders before the print dialog is triggered
+      const timer = setTimeout(() => {
+        window.print();
+        onClose();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [autoPrint, onClose]);
+
   const handlePrint = () => {
     if (saveSettings) {
       localStorage.setItem('print_save_settings', 'true');
@@ -14,20 +76,26 @@ const PrintPreviewModal = ({ patientId, patientName, onClose }) => {
       localStorage.removeItem('print_save_settings');
     }
 
-    if (window.confirm('Ready to print to the thermal printer? Please ensure labels are loaded.')) {
-      window.print();
-    }
+    // Direct print call. Avoid window.confirm as it forces the browser out of fullscreen mode.
+    window.print();
   };
 
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in print-hide">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+  const modalContent = autoPrint ? (
+    <div className="fixed inset-0 z-[200] print-hide-modal pointer-events-none">
+      {/* Hidden container that only shows during printing */}
+      <div className="print-area hidden">
+         <ThermalLabel patientId={patientId} patientName={patientName} />
+      </div>
+    </div>
+  ) : (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in print-hide-modal">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col hide-in-print">
         
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
           <div className="flex items-center gap-2 text-[var(--color-primary)]">
             <Printer size={20} />
-            <h3 className="font-headline font-bold">Print Preview</h3>
+            <h3 className="font-headline font-bold">Thermal Label Preview</h3>
           </div>
           <button 
             onClick={onClose}
@@ -40,12 +108,12 @@ const PrintPreviewModal = ({ patientId, patientName, onClose }) => {
         {/* Content Preview */}
         <div className="p-8 flex flex-col items-center bg-gray-100/50">
           <p className="text-xs text-center text-gray-500 mb-6 max-w-[250px]">
-            This is exactly how the ID Card will appear on the physical thermal label.
+            Optimized for thermal barcode printers (e.g. 50x30mm).
           </p>
           
           {/* The actual component we print */}
-          <div className="print-area w-full flex justify-center">
-            <PatientIDCard patientId={patientId} patientName={patientName} />
+          <div className="flex justify-center bg-gray-200 p-4 rounded-lg shadow-inner">
+             <ThermalLabel patientId={patientId} patientName={patientName} />
           </div>
         </div>
 
@@ -82,10 +150,16 @@ const PrintPreviewModal = ({ patientId, patientName, onClose }) => {
             </button>
           </div>
         </div>
-
+      </div>
+      
+      {/* Hidden container that only shows during printing */}
+      <div className="print-area hidden">
+         <ThermalLabel patientId={patientId} patientName={patientName} />
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default PrintPreviewModal;

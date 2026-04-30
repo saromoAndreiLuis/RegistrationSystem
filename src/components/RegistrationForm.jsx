@@ -8,7 +8,7 @@ import QRScanner from './QRScanner';
 import PatientIDCard from './PatientIDCard';
 import BarcodeListener from './BarcodeListener';
 import PrintPreviewModal from './PrintPreviewModal';
-import { APPS_SCRIPT_URL } from '../config';
+import { APPS_SCRIPT_URL, API_KEY } from '../config';
 import { usePatientCache } from '../context/PatientCacheContext';
 
 const SERVICE_PROGRAMS = ['CWOP', 'Blood Letting', 'Blood Extraction', 'General Registration'];
@@ -36,7 +36,8 @@ const EMPTY_FORM = {
   bloodType: '',
   lastDonationDate: '',
   referredBy: '',
-  patientId: ''
+  patientId: '',
+  botCheck: ''
 };
 
 const padId = (id) => String(id || '').padStart(4, '0');
@@ -147,7 +148,8 @@ const RegistrationForm = () => {
 
       // v0.0.9 BATCH SYNC: Send all items in one go
       const response = await axios.post(APPS_SCRIPT_URL, {
-        action: 'batch_sync',
+        action: "batch_sync",
+        apiKey: API_KEY,
         payloads: queue
       }, { 
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -285,6 +287,15 @@ const RegistrationForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // HONEYPOT CHECK
+    if (formData.botCheck) {
+      console.warn("Honeypot triggered. Aborting submission.");
+      setStatus('success');
+      setStatusMessage("Submission processed.");
+      return;
+    }
+
     if (!validate()) return;
 
     if (formData.serviceProgram === 'CWOP' && formData.programType === 'Laboratory' && selectedLabTests.length === 0) {
@@ -306,6 +317,7 @@ const RegistrationForm = () => {
       providedId: assignedId,
       patientId: assignedId,
       eventName: formData.serviceProgram,
+      apiKey: API_KEY,
       date: new Date().toISOString().split('T')[0],
       time: new Date().toTimeString().split(' ')[0],
     };
@@ -382,7 +394,7 @@ const RegistrationForm = () => {
             <CheckCircle2 size={24} />
             <span className="font-headline font-semibold text-lg">{statusMessage}</span>
           </div>
-          <PatientIDCard patientId={newRegistrationId} patientName={formData.fullName} />
+          <PatientIDCard patientId={newRegistrationId} patientName={`${formData.firstName} ${formData.surname}`.trim()} />
           
           <div className="flex flex-col sm:flex-row gap-3 w-full mt-4">
             <button
@@ -403,7 +415,7 @@ const RegistrationForm = () => {
           {showPrintModal && (
             <PrintPreviewModal 
               patientId={newRegistrationId} 
-              patientName={formData.fullName} 
+              patientName={`${formData.firstName} ${formData.surname}`.trim()} 
               onClose={() => setShowPrintModal(false)} 
             />
           )}
@@ -441,6 +453,17 @@ const RegistrationForm = () => {
       )}
 
       <form onSubmit={handleSubmit} noValidate className="glass-panel p-6 sm:p-8 rounded-2xl transition-all">
+        
+        {/* Honeypot field (hidden from humans) */}
+        <input 
+          type="text" 
+          name="botCheck" 
+          value={formData.botCheck} 
+          onChange={handleChange} 
+          style={{ display: 'none' }} 
+          tabIndex="-1" 
+          autoComplete="off" 
+        />
 
         {/* ── SCAN BAR ── */}
         <div className="flex flex-wrap items-center gap-2 mb-6 p-3 bg-gray-50 rounded-xl border border-gray-200">
@@ -450,7 +473,7 @@ const RegistrationForm = () => {
               <div className="flex items-center gap-2 text-emerald-600">
                 <Lock size={16} />
                 <span className="text-sm font-medium font-body">
-                  Returning user: <span className="font-semibold">{scannedPatient?.fullName || formData.fullName}</span>
+                  Returning user: <span className="font-semibold">{scannedPatient?.fullName || `${formData.firstName} ${formData.surname}`.trim()}</span>
                 </span>
               </div>
             ) : (

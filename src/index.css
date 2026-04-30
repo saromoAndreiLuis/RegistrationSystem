@@ -95,43 +95,42 @@
    THERMAL PRINT TARGETING (Phase 4)
    ========================================================================== */
 @media print {
-  /* Hide everything by default */
-  body * {
-    visibility: hidden;
-  }
-  
-  /* Reset margins and backgrounds for strict print area */
   @page {
     margin: 0;
     size: auto;
   }
   
-  /* Only show the ID Card content */
-  .print-area, .print-area * {
-    visibility: visible;
+  /* Hide the rest of the app */
+  body {
+    background: white !important;
   }
   
-  /* Position the print area perfectly at top left without scaling issues */
+  #root > :not(.print-hide-modal) {
+    display: none !important;
+  }
+  
+  .hide-in-print {
+    display: none !important;
+  }
+
+  /* Expose just the print area */
   .print-area {
-    position: absolute;
+    display: flex !important;
+    position: fixed;
     left: 0;
     top: 0;
-    width: 100vw !important;
-    height: 100vh !important;
-    transform: none !important;
-    box-shadow: none !important;
-    border: none !important;
-    background: white !important;
-    margin: 0 !important;
-    padding: 10mm !important;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    width: 100vw;
+    height: 100vh;
+    background: white;
+    z-index: 9999;
+    align-items: flex-start;
+    justify-content: flex-start;
   }
   
-  /* Force hide UI wrappers */
-  nav, .glass-panel, button, .lucide {
-    display: none !important;
+  .thermal-label-container {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 2mm !important;
+    page-break-after: always;
   }
 }

@@ -13,6 +13,7 @@ import ModeToggle from './components/ModeToggle';
 import ShortcutHandler from './components/ShortcutHandler';
 import FullscreenManager from './components/FullscreenManager';
 import DevTools from './components/DevTools';
+import AdminAuth from './components/AdminAuth';
 
 function App() {
   return (
@@ -27,10 +28,14 @@ function App() {
             <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/register" element={<RegistrationPage />} />
-            <Route path="/admin" element={<DashboardPage />} />
-            <Route path="/admin/:category" element={<PatientList />} />
-            <Route path="/admin/:category/:patientId" element={<PatientDetails />} />
-            <Route path="/admin/:category/:patientId/event/:eventId" element={<EventDetails />} />
+            
+            {/* Protected Admin Routes */}
+            <Route element={<AdminAuth />}>
+              <Route path="/admin" element={<DashboardPage />} />
+              <Route path="/admin/:category" element={<PatientList />} />
+              <Route path="/admin/:category/:patientId" element={<PatientDetails />} />
+              <Route path="/admin/:category/:patientId/event/:eventId" element={<EventDetails />} />
+            </Route>
           </Routes>
         </div>
         <ModeToggle />

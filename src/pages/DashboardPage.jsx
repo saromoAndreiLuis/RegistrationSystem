@@ -109,11 +109,19 @@ const DashboardPage = () => {
     const usersToday = patients.filter(p => isToday(p.timestamp)).length;
     const servicesToday = history.filter(h => isToday(h.timestamp) || isToday(h.date)).length;
 
-    const categories = ['Beneficiary', 'Volunteer', 'Sponsor', 'Staff', 'Other'];
-    const categoryData = categories.map(cat => ({
-      name: cat,
-      count: patients.filter(p => p.category === cat).length
-    }));
+    const mainCategories = ['Beneficiary', 'Volunteer', 'Sponsor', 'Staff'];
+    let accountedCount = 0;
+    const categoryData = mainCategories.map(cat => {
+      const count = patients.filter(p => p.category === cat).length;
+      accountedCount += count;
+      return { name: cat, count };
+    });
+    
+    // Everything else (including empty categories or literal 'Other') goes into 'Other'
+    categoryData.push({ 
+      name: 'Other', 
+      count: Math.max(0, patients.length - accountedCount) 
+    });
 
     const normalize = (str) => String(str || '').toLowerCase().replace(/[\s-]/g, '');
     
@@ -288,7 +296,7 @@ const DashboardPage = () => {
               <h3 className="text-base font-bold text-gray-900 mb-3 font-headline leading-none">User Category Mix</h3>
               <div className="space-y-3 flex-1 flex flex-col justify-center">
                 {stats.categoryData.map((cat, idx) => {
-                  const percentage = stats.totalUsers > 0 ? Math.round((cat.count / stats.totalUsers) * 100) : 0;
+                  const percentage = stats.totalUsers > 0 ? ((cat.count / stats.totalUsers) * 100).toFixed(1) : "0.0";
                   return (
                     <div key={idx} className="space-y-1">
                       <div className="flex justify-between text-[10px]">

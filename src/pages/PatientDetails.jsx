@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { UserCircle2, ArrowLeft, Calendar, ChevronRight, Loader2, AlertCircle, CreditCard, X } from 'lucide-react';
+import { UserCircle2, ArrowLeft, Calendar, ChevronRight, Loader2, AlertCircle, CreditCard, Printer, X } from 'lucide-react';
 import PatientIDCard from '../components/PatientIDCard';
+import PrintPreviewModal from '../components/PrintPreviewModal';
 import { usePatientCache } from '../context/PatientCacheContext';
 import Skeleton from '../components/Skeleton';
 
@@ -49,6 +50,7 @@ const PatientDetails = () => {
   const navigate = useNavigate();
   const { findPatientById, getPatientHistory, loading } = usePatientCache();
   const [showIDCard, setShowIDCard] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   const patient = findPatientById(patientId);
   const allHistory = getPatientHistory(patientId);
@@ -148,12 +150,23 @@ const PatientDetails = () => {
                 </span>
               </div>
             </div>
-            <button 
-              onClick={() => setShowIDCard(true)}
-              className="hidden sm:flex items-center gap-2 text-gray-400 hover:text-[var(--color-primary)] transition-colors"
-            >
-              <CreditCard size={20} />
-            </button>
+            
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setShowPrintModal(true)}
+                className="flex items-center justify-center p-2 text-gray-400 hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 rounded-xl transition-colors"
+                title="Print Label"
+              >
+                <Printer size={20} />
+              </button>
+              <button 
+                onClick={() => setShowIDCard(true)}
+                className="flex items-center justify-center p-2 text-gray-400 hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 rounded-xl transition-colors"
+                title="View ID Card"
+              >
+                <CreditCard size={20} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -193,6 +206,14 @@ const PatientDetails = () => {
             <PatientIDCard patientId={patient.id} patientName={patient.fullName} />
           </div>
         </div>
+      )}
+
+      {showPrintModal && (
+        <PrintPreviewModal 
+          patientId={patient.id} 
+          patientName={patient.fullName} 
+          onClose={() => setShowPrintModal(false)} 
+        />
       )}
     </div>
   );

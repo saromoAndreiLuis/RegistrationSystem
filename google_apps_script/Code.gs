@@ -8,11 +8,17 @@ const CONFIG = {
   PATIENTS_SHEET: "patients",
   HISTORY_SHEET: "history",
   TOKENS_SHEET: "sync_tokens",
-  ID_PADDING: 4
+  ID_PADDING: 4,
+  API_KEY: "TGLFI-SECURE-KEY-2026"
 };
 
 function doGet(e) {
   try {
+    // API KEY VERIFICATION
+    if (e.parameter.apiKey !== CONFIG.API_KEY) {
+      return createJsonResponse({ success: false, error: "Unauthorized" });
+    }
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const patientsSheet = ss.getSheetByName(CONFIG.PATIENTS_SHEET);
     const historySheet = ss.getSheetByName(CONFIG.HISTORY_SHEET);
@@ -49,6 +55,11 @@ function doPost(e) {
     lock.waitLock(30000);
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const contents = JSON.parse(e.postData.contents);
+
+    // API KEY VERIFICATION
+    if (contents.apiKey !== CONFIG.API_KEY) {
+      return createJsonResponse({ success: false, error: "Unauthorized" });
+    }
     
     // Support for BATCH SYNC (v0.0.9 Feature)
     if (contents.action === "batch_sync" && Array.isArray(contents.payloads)) {
@@ -78,7 +89,11 @@ function doPost(e) {
 }
 
 function processAction(ss, data) {
+  // SERVER-SIDE VALIDATION
   if (data.action === "register" || data.action === "registerAndAddService") {
+    if (!data.firstName || !data.surname || !data.category) {
+      return { success: false, error: "Missing required fields (firstName, surname, category)" };
+    }
     return handleRegistration(ss, data);
   } else if (data.action === "addService") {
     return handleAddService(ss, data);

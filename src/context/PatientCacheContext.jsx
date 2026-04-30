@@ -1,10 +1,17 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
-import { APPS_SCRIPT_URL } from '../config';
+import { APPS_SCRIPT_URL, API_KEY } from '../config';
 
 const PatientCacheContext = createContext();
 
 export const usePatientCache = () => useContext(PatientCacheContext);
+
+const processPatients = (patients) => {
+  return patients.map(p => ({
+    ...p,
+    fullName: p.fullName || `${p.firstName || ''} ${p.surname || ''}`.trim() || 'Unknown Name'
+  }));
+};
 
 export const PatientCacheProvider = ({ children }) => {
   const [patients, setPatients] = useState([]);
@@ -20,7 +27,7 @@ export const PatientCacheProvider = ({ children }) => {
     const storedTimestamp = localStorage.getItem('patientCache_timestamp');
 
     try {
-      if (storedPatients) setPatients(JSON.parse(storedPatients));
+      if (storedPatients) setPatients(processPatients(JSON.parse(storedPatients)));
       if (storedHistory) setHistory(JSON.parse(storedHistory));
       if (storedTimestamp) setLastUpdated(new Date(storedTimestamp));
     } catch (e) {
@@ -35,9 +42,9 @@ export const PatientCacheProvider = ({ children }) => {
   const refreshCache = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.get(APPS_SCRIPT_URL);
+      const response = await axios.get(`${APPS_SCRIPT_URL}?apiKey=${API_KEY}`);
       if (response.data.success) {
-        const newPatients = response.data.data.patients || [];
+        const newPatients = processPatients(response.data.data.patients || []);
         const newHistory = response.data.data.history || [];
         const now = new Date();
 
