@@ -9,7 +9,7 @@ export const usePatientCache = () => useContext(PatientCacheContext);
 const processPatients = (patients) => {
   return patients.map(p => ({
     ...p,
-    fullName: p.fullName || `${p.firstName || ''} ${p.surname || ''}`.trim() || 'Unknown Name'
+    fullName: p.fullName || `${p.firstName || ''} ${p.surname || ''}${p.suffix ? ' ' + p.suffix : ''}`.trim() || 'Unknown Name'
   }));
 };
 
@@ -69,6 +69,23 @@ export const PatientCacheProvider = ({ children }) => {
       refreshCache();
     }
   }, [refreshCache, lastUpdated]);
+  
+  const updatePatientInCache = useCallback((updatedPatient) => {
+    setPatients(prev => {
+      const processed = processPatients([updatedPatient])[0];
+      const next = prev.map(p => p.id === updatedPatient.id ? { ...p, ...processed } : p);
+      localStorage.setItem('patientCache_patients', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const updateHistoryInCache = useCallback((newLog) => {
+    setHistory(prev => {
+      const next = [newLog, ...prev];
+      localStorage.setItem('patientCache_history', JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   const findPatientById = (id) => {
     if (!id) return null;
@@ -90,6 +107,8 @@ export const PatientCacheProvider = ({ children }) => {
       cacheLoaded,
       lastUpdated,
       refreshCache,
+      updatePatientInCache,
+      updateHistoryInCache,
       findPatientById,
       getPatientHistory
     }}>

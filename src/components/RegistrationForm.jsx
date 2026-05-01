@@ -8,18 +8,9 @@ import QRScanner from './QRScanner';
 import PatientIDCard from './PatientIDCard';
 import BarcodeListener from './BarcodeListener';
 import PrintPreviewModal from './PrintPreviewModal';
-import { APPS_SCRIPT_URL, API_KEY } from '../config';
+import { APPS_SCRIPT_URL, API_KEY, SERVICE_PROGRAMS, getProgramTypes, generateUUID } from '../config';
 import { usePatientCache } from '../context/PatientCacheContext';
 
-const SERVICE_PROGRAMS = ['CWOP', 'Blood Letting', 'Blood Extraction', 'General Registration'];
-
-const getProgramTypes = (service) => {
-  switch (service) {
-    case 'CWOP': return ['Medical', 'Dental', 'Optical', 'Cervical', 'Breast Cancer Screening', 'Laboratory', 'Hairstyle', 'Physical Therapy', 'OB-GYN', 'PEDIA', 'DERMA'];
-    case 'Blood Letting': return ['Donor'];
-    default: return [];
-  }
-};
 
 const EMPTY_FORM = {
   action: 'registerAndAddService',
@@ -27,6 +18,7 @@ const EMPTY_FORM = {
   programType: '',
   firstName: '',
   surname: '',
+  suffix: '',
   birthDate: '',
   age: '',
   gender: '',
@@ -42,12 +34,6 @@ const EMPTY_FORM = {
 
 const padId = (id) => String(id || '').padStart(4, '0');
 
-const generateUUID = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-};
 
 const RegistrationForm = () => {
   const [searchParams] = useSearchParams();
@@ -205,6 +191,7 @@ const RegistrationForm = () => {
       address: patient.address || '',
       contactNumber: patient.contactNumber || '',
       category: patient.category || '',
+      suffix: patient.suffix || '',
       patientId: padId(patient.id),
       serviceProgram: '',
       programType: '',
@@ -313,6 +300,7 @@ const RegistrationForm = () => {
 
     const basePayload = {
       ...formData,
+      fullName: `${formData.firstName} ${formData.surname}${formData.suffix ? ' ' + formData.suffix : ''}`.trim(),
       id: assignedId,
       providedId: assignedId,
       patientId: assignedId,
@@ -632,7 +620,7 @@ const RegistrationForm = () => {
               </div>
 
               <div className="flex gap-4 mb-4">
-                <div className="w-1/2">
+                <div className="w-[40%]">
                   <InputField
                     label="First Name"
                     name="firstName"
@@ -644,7 +632,7 @@ const RegistrationForm = () => {
                     placeholder="Juan"
                   />
                 </div>
-                <div className="w-1/2">
+                <div className="w-[40%]">
                   <InputField
                     label="Surname"
                     name="surname"
@@ -654,6 +642,18 @@ const RegistrationForm = () => {
                     required={!isPatientLocked && !existingPatientId}
                     disabled={isPatientLocked || !!existingPatientId}
                     placeholder="Dela Cruz"
+                  />
+                </div>
+                <div className="w-[20%]">
+                  <InputField
+                    label="Suffix"
+                    name="suffix"
+                    value={formData.suffix}
+                    onChange={handleChange}
+                    error={errors.suffix}
+                    required={false}
+                    disabled={isPatientLocked || !!existingPatientId}
+                    placeholder="Jr."
                   />
                 </div>
               </div>

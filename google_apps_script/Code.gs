@@ -72,13 +72,17 @@ function doPost(e) {
       return createJsonResponse({ success: true, results });
     }
 
-    // Standard Single Action
-    if (contents.syncToken && isDuplicate(ss, contents.syncToken)) {
+    // Standard Single Action - Suppress duplicates only for creation actions
+    const shouldCheckDuplicate = contents.action !== "updatePatient" && contents.action !== "updateHistory";
+    if (shouldCheckDuplicate && contents.syncToken && isDuplicate(ss, contents.syncToken)) {
       return createJsonResponse({ success: true, message: "Duplicate suppressed" });
     }
 
     const result = processAction(ss, contents);
-    if (result.success && contents.syncToken) logSyncToken(ss, contents.syncToken);
+    // Only log tokens for creation actions to prevent future duplicate suppression for updates
+    if (result.success && contents.syncToken && shouldCheckDuplicate) {
+      logSyncToken(ss, contents.syncToken);
+    }
 
     return createJsonResponse(result);
   } catch (err) {
@@ -97,6 +101,10 @@ function processAction(ss, data) {
     return handleRegistration(ss, data);
   } else if (data.action === "addService") {
     return handleAddService(ss, data);
+  } else if (data.action === "updatePatient") {
+    return handleUpdatePatient(ss, data);
+  } else if (data.action === "updateHistory") {
+    return handleUpdateHistory(ss, data);
   }
   return { success: false, error: "Invalid action" };
 }
@@ -122,13 +130,15 @@ function handleRegistration(ss, data) {
     new Date().toISOString(), // ISO Timestamp for Delta Sync
     data.firstName,
     data.surname,
+    data.suffix || "",      // [NEW] Suffix (Jr., Sr., etc)
     data.birthDate,
     data.age,
     data.gender,
     data.address,
     data.contactNumber,
     data.category,
-    "active"
+    data.bloodType || "",   // [NEW] Blood Type
+    "active"                // Status
   ];
   
   sheet.appendRow(newRow);
@@ -139,6 +149,56 @@ function handleRegistration(ss, data) {
   }
 
   return { success: true, patientId: nextId };
+}
+
+function handleUpdatePatient(ss, data) {
+  const sheet = ss.getSheetByName(CONFIG.PATIENTS_SHEET);
+  const rows = sheet.getDataRange().getValues();
+  const headers = rows[0].map(h => String(h).trim());
+  const idCol = headers.indexOf("id");
+  
+  if (idCol === -1) return { success: false, error: "ID column not found" };
+
+  const targetIdStr = String(data.id || data.patientId || "").replace(/^'+/, '');
+  const targetIdNum = parseInt(targetIdStr, 10);
+  let rowIndex = -1;
+
+  for (let i = 1; i < rows.length; i++) {
+    const currentRowIdStr = String(rows[i][idCol]).replace(/^'+/, '');
+    const currentRowIdNum = parseInt(currentRowIdStr, 10);
+    
+    // Match by numeric value OR exact string match (fallback)
+    if (currentRowIdNum === targetIdNum || currentRowIdStr === targetIdStr) {
+      rowIndex = i + 1;
+      break;
+    }
+  }
+
+  if (rowIndex === -1) return { success: false, error: "Patient not found (ID: " + targetIdStr + ")" };
+
+  // Map incoming data to column indexes
+  const updatedRow = [...rows[rowIndex - 1]];
+  
+  // We only update specific fields to avoid overwriting metadata like original timestamp
+  const fieldsToUpdate = [
+    'firstName', 'surname', 'suffix', 'birthDate', 'age', 
+    'gender', 'address', 'contactNumber', 'category', 'bloodType', 'status'
+  ];
+
+  fieldsToUpdate.forEach(field => {
+    const colIndex = headers.indexOf(field);
+    if (colIndex !== -1 && data[field] !== undefined) {
+      updatedRow[colIndex] = data[field];
+    }
+  });
+
+  // Ensure the ID column maintains its string formatting (leading zeros)
+  if (idCol !== -1) {
+    updatedRow[idCol] = "'" + String(updatedRow[idCol]).replace(/^'+/, '');
+  }
+
+  sheet.getRange(rowIndex, 1, 1, updatedRow.length).setValues([updatedRow]);
+  return { success: true };
 }
 
 function handleAddService(ss, data) {
@@ -154,10 +214,87 @@ function handleAddService(ss, data) {
       log.serviceName,
       log.time || new Date().toLocaleTimeString(),
       log.remarks || "",
-      new Date().toISOString() // ISO Timestamp for Delta Sync
+      log.bloodType || "",
+      log.lastDonationDate || "",
+      log.referredBy || "",
+      log.syncToken || ""
     ];
     sheet.appendRow(row);
+
+    // [NEW] If bloodType is provided during a Blood Letting event, update the patient record
+    if (log.bloodType && log.eventName === 'Blood Letting') {
+      updatePatientBloodType(ss, pid, log.bloodType);
+    }
   });
+
+  return { success: true };
+}
+
+function updatePatientBloodType(ss, patientId, bloodType) {
+  const patientSheet = ss.getSheetByName(CONFIG.PATIENTS_SHEET);
+  const patientsData = patientSheet.getDataRange().getValues();
+  const headers = patientsData[0].map(h => String(h).trim());
+  const idCol = headers.indexOf("id");
+  const bloodTypeCol = headers.indexOf("bloodType");
+  
+  if (idCol !== -1 && bloodTypeCol !== -1) {
+    const targetPid = String(patientId).replace(/^'+/, '');
+    const targetPidNum = parseInt(targetPid, 10);
+
+    for (let i = 1; i < patientsData.length; i++) {
+      const rowIdStr = String(patientsData[i][idCol]).replace(/^'+/, '');
+      const rowIdNum = parseInt(rowIdStr, 10);
+
+      if (rowIdNum === targetPidNum || rowIdStr === targetPid) {
+        patientSheet.getRange(i + 1, bloodTypeCol + 1).setValue(bloodType);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function handleUpdateHistory(ss, data) {
+  const sheet = ss.getSheetByName(CONFIG.HISTORY_SHEET);
+  const rows = sheet.getDataRange().getValues();
+  const headers = rows[0].map(h => String(h).trim());
+  const tokenCol = headers.indexOf("syncToken");
+  
+  if (tokenCol === -1) return { success: false, error: "syncToken column not found in history" };
+
+  const targetToken = data.syncToken;
+  if (!targetToken) return { success: false, error: "Missing syncToken for update" };
+
+  let rowIndex = -1;
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][tokenCol]) === String(targetToken)) {
+      rowIndex = i + 1;
+      break;
+    }
+  }
+
+  if (rowIndex === -1) return { success: false, error: "History record not found" };
+
+  const updatedRow = [...rows[rowIndex - 1]];
+  const fields = ['eventName', 'date', 'serviceName', 'time', 'remarks', 'bloodType', 'lastDonationDate', 'referredBy'];
+
+  fields.forEach(field => {
+    const colIndex = headers.indexOf(field);
+    if (colIndex !== -1 && data[field] !== undefined) {
+      updatedRow[colIndex] = data[field];
+    }
+  });
+
+  sheet.getRange(rowIndex, 1, 1, updatedRow.length).setValues([updatedRow]);
+
+  // [NEW] If bloodType is provided during a Blood Letting event, update the patient record
+  if (data.bloodType && data.eventName === 'Blood Letting') {
+    let patientIdCol = headers.indexOf("patientId");
+    if (patientIdCol === -1) patientIdCol = headers.indexOf("id"); // Try 'id' if 'patientId' is missing
+    if (patientIdCol !== -1) {
+      updatePatientBloodType(ss, updatedRow[patientIdCol], data.bloodType);
+    }
+  }
 
   return { success: true };
 }
@@ -183,10 +320,12 @@ function logSyncToken(ss, token) {
 
 function mapRows(raw) {
   if (raw.length < 2) return [];
-  const headers = raw[0];
+  const headers = raw[0].map(h => String(h).trim());
   return raw.slice(1).map(row => {
     const obj = {};
-    headers.forEach((h, i) => obj[h] = row[i]);
+    headers.forEach((h, i) => {
+      if (h) obj[h] = row[i];
+    });
     return obj;
   });
 }
