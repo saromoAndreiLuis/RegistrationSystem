@@ -144,6 +144,7 @@ const RegistrationForm = () => {
 
       if (response.data.success) {
         localStorage.setItem('registrationQueue', JSON.stringify([]));
+        await refreshCache(); // Update local cache with new IDs from server
         setStatus('success');
         setStatusMessage(`Successfully synced ${queue.length} records!`);
         setTimeout(() => setStatus('idle'), 5000);
@@ -325,19 +326,60 @@ const RegistrationForm = () => {
       }];
     }
 
-    // OPTIMISTIC UI: Save instantly to offline queue
-    const queue = JSON.parse(localStorage.getItem('registrationQueue') || '[]');
-    payloads.forEach(p => queue.push(p));
-    localStorage.setItem('registrationQueue', JSON.stringify(queue));
+    // ATTEMPT LIVE SUBMISSION IF ONLINE
+    if (navigator.onLine && !window.__FORCE_OFFLINE__) {
+      setStatus('loading');
+      setStatusMessage('Submitting to server...');
+      try {
+        const response = await axios.post(APPS_SCRIPT_URL, {
+          action: "batch_sync",
+          apiKey: API_KEY,
+          payloads: payloads
+        }, { 
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          timeout: 15000 
+        });
 
-    // Trigger Success UI immediately
+        if (response.data.success) {
+          await refreshCache();
+          
+          if (formData.action === 'registerAndAddService') {
+            const finalId = response.data.results?.[0]?.patientId || assignedId;
+            
+            setNewRegistrationId(padId(finalId));
+            setStatus('success');
+            setStatusMessage(`Registration successful! Official ID: ${padId(finalId)}`);
+          } else {
+            setStatus('success');
+            setStatusMessage('Service(s) added successfully!');
+            setTimeout(() => {
+              setStatus('idle');
+              setStatusMessage('');
+              setFormData({ ...EMPTY_FORM });
+              setIsPatientLocked(false);
+              setScannedPatient(null);
+              setSelectedLabTests([]);
+            }, 2000);
+          }
+          return; // Exit successfully
+        }
+      } catch (err) {
+        console.warn('Live submission failed, falling back to offline queue:', err);
+      }
+    }
+
+    // FALLBACK TO OFFLINE QUEUE
+    const q = JSON.parse(localStorage.getItem('registrationQueue') || '[]');
+    payloads.forEach(p => q.push(p));
+    localStorage.setItem('registrationQueue', JSON.stringify(q));
+
     if (formData.action === 'registerAndAddService') {
       setNewRegistrationId(assignedId);
       setStatus('success');
-      setStatusMessage(`Registration successful! ID: ${assignedId}`);
+      setStatusMessage(`Registration saved (Offline). Temp ID: ${assignedId}`);
     } else {
       setStatus('success');
-      setStatusMessage('Service(s) added successfully!');
+      setStatusMessage('Service(s) saved to queue (Offline).');
       setTimeout(() => {
         setStatus('idle');
         setStatusMessage('');
@@ -346,11 +388,6 @@ const RegistrationForm = () => {
         setScannedPatient(null);
         setSelectedLabTests([]);
       }, 3000);
-    }
-
-    // Try background sync asynchronously
-    if (navigator.onLine) {
-      processQueue();
     }
   };
 
