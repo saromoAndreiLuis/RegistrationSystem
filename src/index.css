@@ -131,6 +131,8 @@
     border: none !important;
     box-shadow: none !important;
     padding: 2mm !important;
+    padding-bottom: 12mm !important; /* Add extra spacing at the bottom so the physical print cutter doesn't cut into the content */
+    height: auto !important; /* Allow height to grow to accommodate the cut margin */
     page-break-after: always;
   }
 }

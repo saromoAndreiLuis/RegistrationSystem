@@ -4,6 +4,7 @@ import { Maximize, ShieldAlert } from 'lucide-react';
 const FullscreenManager = ({ children }) => {
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const enterFullscreen = useCallback(() => {
     const elem = document.documentElement;
@@ -43,11 +44,29 @@ const FullscreenManager = ({ children }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
 
+    const handleBeforePrint = () => {
+      setIsPrinting(true);
+    };
+
+    const handleAfterPrint = () => {
+      // Re-enter fullscreen mode automatically when the print dialogue is closed
+      enterFullscreen();
+      // Delay resetting the printing flag to allow the fullscreen transition to complete
+      setTimeout(() => {
+        setIsPrinting(false);
+      }, 1000);
+    };
+
+    window.addEventListener('beforeprint', handleBeforePrint);
+    window.addEventListener('afterprint', handleAfterPrint);
+
     return () => {
       document.removeEventListener('fullscreenchange', handleFsChange);
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('afterprint', handleAfterPrint);
     };
-  }, []);
+  }, [enterFullscreen]);
 
   if (!hasInteracted) {
     return (
@@ -76,7 +95,7 @@ const FullscreenManager = ({ children }) => {
 
   return (
     <>
-      {hasInteracted && !isFullscreen && (
+      {hasInteracted && !isFullscreen && !isPrinting && (
         <div className="fixed inset-0 z-[1001] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
           <div className="max-w-md w-full text-center">
             <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">

@@ -109,6 +109,13 @@ const RegistrationForm = () => {
     }
   }, [searchParams]);
 
+  // Auto-trigger printing if save printer alignment settings is enabled
+  useEffect(() => {
+    if (newRegistrationId && localStorage.getItem('print_save_settings') === 'true') {
+      setShowPrintModal(true);
+    }
+  }, [newRegistrationId]);
+
   const processQueue = async () => {
     if (isProcessingQueue.current) return;
     
