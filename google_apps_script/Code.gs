@@ -63,10 +63,23 @@ function doPost(e) {
     
     // Support for BATCH SYNC (v0.0.9 Feature)
     if (contents.action === "batch_sync" && Array.isArray(contents.payloads)) {
+      const tempIdMap = {};
       const results = contents.payloads.map(payload => {
+        // Translate temp ID to real ID if it was mapped in a previous step of this batch
+        const currentPid = payload.patientId || payload.id;
+        if (currentPid && tempIdMap[currentPid]) {
+          if (payload.patientId) payload.patientId = tempIdMap[currentPid];
+          if (payload.id) payload.id = tempIdMap[currentPid];
+        }
+
         if (payload.syncToken && isDuplicate(ss, payload.syncToken)) return { success: true, message: "Duplicate" };
         const res = processAction(ss, payload);
         if (res.success && payload.syncToken) logSyncToken(ss, payload.syncToken);
+        
+        // If this action registered a new patient, record the mapping
+        if (res.success && res.patientId && currentPid) {
+          tempIdMap[currentPid] = res.patientId;
+        }
         return res;
       });
       return createJsonResponse({ success: true, results });

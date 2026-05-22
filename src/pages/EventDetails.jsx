@@ -4,7 +4,7 @@ import { Clock, Plus, X, Loader2, AlertCircle, ArrowLeft, ChevronRight } from 'l
 import SubmitButton from '../components/SubmitButton';
 import InputField from '../components/InputField';
 import axios from 'axios';
-import { APPS_SCRIPT_URL } from '../config';
+import { APPS_SCRIPT_URL, API_KEY } from '../config';
 import { usePatientCache } from '../context/PatientCacheContext';
 
 const AddServiceModal = ({ isOpen, onClose, onAdd, eventInfo, patientId }) => {
@@ -23,6 +23,7 @@ const AddServiceModal = ({ isOpen, onClose, onAdd, eventInfo, patientId }) => {
     
     const payload = {
       action: 'addService',
+      apiKey: API_KEY,
       patientId: patientId,
       eventName: eventInfo.eventName,
       date: eventInfo.date,

@@ -1,6 +1,6 @@
 // Configuration for the Community Outreach Registration System
 export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyvw6kIB0e_YFUGuVeSf9G67GRGUOHzRvVFSjF16SV4d2nxueVwJjMz8P5PfWiPKAJTUw/exec'; // v0.1.3 script
-export const APP_VERSION = 'v0.1.3';
+export const APP_VERSION = 'v1.0.0';
 
 // SECURITY CONFIGURATION
 export const API_KEY = 'TGLFI-SECURE-KEY-2026';
@@ -11,7 +11,8 @@ export const ADMIN_PIN = '2026'; // Change this to your preferred admin password
 export const IS_DEV_MODE = false;
 
 // SERVICE DEFINITIONS
-export const SERVICE_PROGRAMS = ['CWOP', 'Blood Letting', 'Blood Extraction', 'General Registration'];
+// const SERVICE_PROGRAMS = ['CWOP', 'Blood Letting', 'Blood Extraction', 'General Registration'];
+export const SERVICE_PROGRAMS = ['CWOP', 'General Registration'];
 
 export const getProgramTypes = (service) => {
     switch (service) {

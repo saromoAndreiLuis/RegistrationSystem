@@ -130,8 +130,6 @@ const RegistrationForm = () => {
     if (queue.length === 0) return;
 
     isProcessingQueue.current = true;
-    setStatus('loading');
-    setStatusMessage(`Syncing ${queue.length} offline records...`);
 
     try {
       // DEV MODE: Simulated Outage
@@ -151,18 +149,15 @@ const RegistrationForm = () => {
 
       if (response.data.success) {
         localStorage.setItem('registrationQueue', JSON.stringify([]));
+        // Trigger storage event so queue count pill in Navbar updates immediately
+        window.dispatchEvent(new Event('storage'));
         await refreshCache(); // Update local cache with new IDs from server
-        setStatus('success');
-        setStatusMessage(`Successfully synced ${queue.length} records!`);
-        setTimeout(() => setStatus('idle'), 5000);
       } else {
         throw new Error(response.data.error || 'Batch sync failed');
       }
     } catch (err) {
-      console.error('Batch sync failed:', err);
+      console.error('Batch sync failed silently in background:', err);
       // Keep items in queue for next attempt
-      setStatus('error');
-      setStatusMessage('Sync failed. Will retry later.');
     } finally {
       isProcessingQueue.current = false;
     }
@@ -320,8 +315,9 @@ const RegistrationForm = () => {
 
     let payloads = [];
     if (formData.serviceProgram === 'CWOP' && formData.programType === 'Laboratory') {
-      payloads = selectedLabTests.map(test => ({
+      payloads = selectedLabTests.map((test, index) => ({
         ...basePayload,
+        action: index === 0 ? formData.action : 'addService',
         serviceName: `LAB - ${test}`,
         syncToken: generateUUID(),
       }));
@@ -333,60 +329,22 @@ const RegistrationForm = () => {
       }];
     }
 
-    // ATTEMPT LIVE SUBMISSION IF ONLINE
-    if (navigator.onLine && !window.__FORCE_OFFLINE__) {
-      setStatus('loading');
-      setStatusMessage('Submitting to server...');
-      try {
-        const response = await axios.post(APPS_SCRIPT_URL, {
-          action: "batch_sync",
-          apiKey: API_KEY,
-          payloads: payloads
-        }, { 
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          timeout: 15000 
-        });
-
-        if (response.data.success) {
-          await refreshCache();
-          
-          if (formData.action === 'registerAndAddService') {
-            const finalId = response.data.results?.[0]?.patientId || assignedId;
-            
-            setNewRegistrationId(padId(finalId));
-            setStatus('success');
-            setStatusMessage(`Registration successful! Official ID: ${padId(finalId)}`);
-          } else {
-            setStatus('success');
-            setStatusMessage('Service(s) added successfully!');
-            setTimeout(() => {
-              setStatus('idle');
-              setStatusMessage('');
-              setFormData({ ...EMPTY_FORM });
-              setIsPatientLocked(false);
-              setScannedPatient(null);
-              setSelectedLabTests([]);
-            }, 2000);
-          }
-          return; // Exit successfully
-        }
-      } catch (err) {
-        console.warn('Live submission failed, falling back to offline queue:', err);
-      }
-    }
-
-    // FALLBACK TO OFFLINE QUEUE
+    // Save to sync queue immediately for offline-first zero-delay operation
     const q = JSON.parse(localStorage.getItem('registrationQueue') || '[]');
     payloads.forEach(p => q.push(p));
     localStorage.setItem('registrationQueue', JSON.stringify(q));
+    
+    // Trigger storage event so queue count pill in Navbar updates immediately
+    window.dispatchEvent(new Event('storage'));
 
+    // Optimistic UI updates
     if (formData.action === 'registerAndAddService') {
       setNewRegistrationId(assignedId);
       setStatus('success');
-      setStatusMessage(`Registration saved (Offline). Temp ID: ${assignedId}`);
+      setStatusMessage(`Registration successful! ID: ${assignedId}`);
     } else {
       setStatus('success');
-      setStatusMessage('Service(s) saved to queue (Offline).');
+      setStatusMessage('Service(s) added successfully!');
       setTimeout(() => {
         setStatus('idle');
         setStatusMessage('');
@@ -394,8 +352,13 @@ const RegistrationForm = () => {
         setIsPatientLocked(false);
         setScannedPatient(null);
         setSelectedLabTests([]);
-      }, 3000);
+      }, 2000);
     }
+
+    // Process the queue asynchronously in the background
+    setTimeout(() => {
+      processQueue();
+    }, 0);
   };
 
   const saveToQueue = (data) => {
