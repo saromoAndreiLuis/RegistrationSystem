@@ -73,7 +73,28 @@ export const PatientCacheProvider = ({ children }) => {
   const updatePatientInCache = useCallback((updatedPatient) => {
     setPatients(prev => {
       const processed = processPatients([updatedPatient])[0];
-      const next = prev.map(p => p.id === updatedPatient.id ? { ...p, ...processed } : p);
+      const targetIdStr = String(processed.id).replace(/^'+/, '');
+      const targetIdNum = parseInt(targetIdStr, 10);
+
+      const exists = prev.some(p => {
+        const pIdStr = String(p.id).replace(/^'+/, '');
+        const pIdNum = parseInt(pIdStr, 10);
+        return pIdStr === targetIdStr || (!isNaN(targetIdNum) && !isNaN(pIdNum) && pIdNum === targetIdNum);
+      });
+
+      let next;
+      if (exists) {
+        next = prev.map(p => {
+          const pIdStr = String(p.id).replace(/^'+/, '');
+          const pIdNum = parseInt(pIdStr, 10);
+          if (pIdStr === targetIdStr || (!isNaN(targetIdNum) && !isNaN(pIdNum) && pIdNum === targetIdNum)) {
+            return { ...p, ...processed };
+          }
+          return p;
+        });
+      } else {
+        next = [...prev, processed];
+      }
       localStorage.setItem('patientCache_patients', JSON.stringify(next));
       return next;
     });
